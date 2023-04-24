@@ -9,6 +9,8 @@ from PIL import Image, ImageFilter
 from scipy.interpolate import CubicSpline
 from scipy.ndimage import zoom
 from functools import wraps, partial
+from itertools import product
+from typing import Optional, Union
 
 
 # Define command-line arguments
@@ -22,7 +24,20 @@ parser.add_argument('--scale', type=float, default=2.0, help='scale factor for u
 parser.add_argument('--blend', type=float, default=0.5, help='blending percentage for pre-scaled images (only applies if --prescaled_dir is used)')
 parser.add_argument('--sharpen', choices=['unsharp_mask', 'cas'], default=None, help='type of sharpening filter to apply after upscaling')
 parser.add_argument('--silent', action="store_true", default=False, help='silences warnings and outputs')
+parser.add_argument('--recurse', action="store_true", default=False, help='recurse down the input directories')
+parser.add_argument('--skip', action="store_true", default=False, help='skips overwriting temporary files.')
+parser.add_argument('--keep', action="store_true", default=False, help='keeps temporary files after operation.')
+parser.add_argument('--no_compress', action="store_true", default=False, help='do not compress the processed files.')
 parser.add_argument('-p', type=int, default=1, help='the number of processes (forces the process to be silent if p > 1, default: %(default)s)')
+
+is_tool = lambda name: shutil.which(name) is not None
+
+# HAS_TEXCONV = is_tool("texconv")
+# HAS_TEXASSEMBLE = is_tool("texassemble")
+HAS_NVTT = is_tool("nvcompress")
+HAS_ATI_MAPGEN = is_tool("CubeMapGen")
+# HAS_TEXASSEMBLE = is_tool("texassemble")
+HAS_CRUNCH = is_tool("crunch_x64")
 
 
 class InterpolationSettings:
@@ -42,6 +57,55 @@ class SharpenSettings:
     UnsharpMask = 0
     CAS = 1
 
+def scan_dir(path: str, recurse: bool = False, dirs: bool = False):
+    for entry in os.scandir(path):
+        if entry.is_file():
+            if not dirs:
+                yield entry.path
+        else:
+            if dirs and len(next(os.walk(entry))[2]):
+                yield entry.path
+            yield from scan_dir(entry.path, recurse=recurse, dirs=dirs)
+
+def flatten_dir(directory):
+    index = 0
+    file_paths = {}
+    for root, _, files in os.walk(directory):
+        for filename in files:
+            new_filename = f"{index}_{filename}"
+            index += 1
+            src_path = os.path.join(root, filename)
+            file_paths[new_filename] =  os.path.relpath(root, directory)
+            dest_path = os.path.join(directory, new_filename)
+            shutil.move(src_path, dest_path)
+    for root, dirs, _ in os.walk(directory, topdown=False):
+        for dir in dirs:
+            dir_path = os.path.join(root, dir)
+            try:
+                os.rmdir(dir_path)
+            except OSError:
+                pass
+    return file_paths
+
+def unflatten_dir(directory, file_paths):
+    for filename, orig_dir in file_paths.items():
+        orig_filename = filename.split("_", 1)[1]
+        dest_dir = os.path.join(directory, orig_dir)
+        dest_path = os.path.join(dest_dir, orig_filename)
+        os.makedirs(dest_dir, exist_ok=True)
+        shutil.move(os.path.join(directory, filename), dest_path)
+
+def run_proc(command: str, *, silent: bool = False):
+    # execute the external program and capture the output
+    echo = partial(print, end='')
+    stdout = subprocess.DEVNULL if silent else subprocess.PIPE
+    with subprocess.Popen(command, stdout=stdout, stderr=subprocess.PIPE) as prc:
+        if not silent:
+            while prc.poll() is None:
+                out = prc.stdout.readline()
+                echo(out.decode())
+        err = prc.stderr.read()
+        echo(err.decode())
 
 def pil_to_numpy(func):
     @wraps(func)
@@ -190,12 +254,24 @@ def unsharp_mask(image, radius=2, amount=1, threshold=0):
 
 @pil_to_numpy
 @srgb_conversion
-def amd_cas(image, sharpness=0.5, contrast=0.5, adaptive_sharpening=0.5):
+def amd_cas(image, sharpness=0.5, contrast=0.5, adaptive_sharpening=0.5, sharpen_alpha=True):
+    def sharpen_mono(y):
+        blur = np.zeros_like(y)
+        cv2.GaussianBlur(y, (0, 0), sigmaX=1.0, sigmaY=1.0, dst=blur)
+
+        local_contrast = y - blur
+        sharpening = sharpness * local_contrast
+
+        adjusted_contrast = contrast * (y - 0.5) + 0.5
+        sharpened_y = y + sharpening * adjusted_contrast * adaptive_sharpening
+        return sharpened_y
+
     img_array = image.astype(np.float32) / 255.0
 
-    if img_array.shape[2] == 4:  # RGBA image
+    has_alpha = img_array.shape[2] == 4
+    if has_alpha:  # RGBA image
         rgb_array = img_array[:, :, :3]
-        alpha_array = img_array[:, :, 3:]
+        alpha_array = img_array[:, :, 3]
     else:  # RGB image
         rgb_array = img_array
         alpha_array = None
@@ -203,20 +279,15 @@ def amd_cas(image, sharpness=0.5, contrast=0.5, adaptive_sharpening=0.5):
     yuv = np.dot(rgb_array, np.array([[0.299, 0.587, 0.114], [-0.14713, -0.28886, 0.436], [0.615, -0.51498, -0.10001]]))
     y = yuv[:, :, 0]
 
-    blur = np.zeros_like(y)
-    cv2.GaussianBlur(y, (0, 0), sigmaX=1.0, sigmaY=1.0, dst=blur)
-
-    local_contrast = y - blur
-    sharpening = sharpness * local_contrast
-
-    adjusted_contrast = contrast * (y - 0.5) + 0.5
-    sharpened_y = y + sharpening * adjusted_contrast * adaptive_sharpening
+    sharpened_y = sharpen_mono(y)
+    if has_alpha and sharpen_alpha:
+        alpha_array = sharpen_mono(alpha_array)
 
     sharpened_yuv = np.dstack((sharpened_y, yuv[:, :, 1], yuv[:, :, 2]))
     sharpened_rgb = np.dot(sharpened_yuv, np.array([[1.0, 0.0, 1.13983], [1.0, -0.39465, -0.58060], [1.0, 2.03211, 0.0]]))
 
-    if alpha_array is not None:
-        sharpened = np.dstack((sharpened_rgb, alpha_array))
+    if has_alpha:
+        sharpened = np.dstack((sharpened_rgb, np.expand_dims(alpha_array, axis=2)))
     else:
         sharpened = sharpened_rgb
 
@@ -302,7 +373,6 @@ def apply_alpha_channel(source_img: Image.Image, dest_img: Image.Image) -> Image
 
     return out_img
 
-
 def normalize_channels(image, channels):
     channels = set(c.lower() for c in channels)
     bands = image.split()
@@ -383,6 +453,11 @@ def parse_items(lines, *, return_count=False):
         lines = lines[h:]
     return (info, lines_parsed) if return_count else info
 
+def get_dds_info(path: str):
+    proc = subprocess.Popen(f'nvddsinfo "{path}"', stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    info = parse_items(proc.stdout.read().decode().split("\n"))
+    return info
+
 def dict_get(d: dict, path: str):
     path = path.split(".")
     for i, k in enumerate(path):
@@ -393,16 +468,6 @@ def dict_get(d: dict, path: str):
             if i + 1 != len(path):
                 d = d[1]
     return d
-
-def run_proc(command_string):
-    # execute the external program and capture the output
-    echo = partial(print, end='')
-    with subprocess.Popen(command_string, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as prc:
-        while prc.poll() is None:
-            out = prc.stdout.readline()
-            echo(out.decode())
-        err = prc.stderr.read()
-        echo(err.decode())
 
 def get_format_tag(info: dict):
     flags = dict_get(info, "Pixel Format.Flags")[1]
@@ -416,68 +481,123 @@ def get_format_tag(info: dict):
     swizzle = dict_get(info, "Pixel Format.Swizzle")
     if swizzle is not None:
         tag_list.append(swizzle.split()[0].strip("'"))
+    if dict_get(info, "Caps.Caps 2.DDSCAPS2_CUBEMAP_ALL_FACES"):
+        tag_list.append("CUBEMAP")
 
     tag = "_".join(tag_list)
 
     return tag
 
+def decompress(orig_path: str, target_path: str, tag: str, *, silent: bool = False):
+    decompress_args = []
+    is_cubemap = (tag.split("_")[-1] == "CUBEMAP")
+    if is_cubemap:
+        tag = "_".join(tag.split("_")[:-1])
+        decompress_args.append("-faces")
+    if tag == "DXT5_xGxR":
+        decompress_args.append("-forcenormal")
+    d_arg_str = " ".join(decompress_args)
+    
+    run_proc(f"nvdecompress -format png {d_arg_str} \"{orig_path}\" \"{target_path}\"", silent=silent)
 
-def decompress_and_scale(filename: str, args, config: dict):
-    prescaled_ext = (".dds", ".png", ".tiff", ".jpg")
-    get_path_w_ext = lambda path_wo_ext: [path_wo_ext + e for e in prescaled_ext if os.path.exists(path_wo_ext + e)][0]
+def process_image(img: Union[Image.Image, str], scale: float, interpolation: InterpolationSettings, sharpen: Optional[SharpenSettings] = None):
+    image = Image.open(img) if isinstance(img, str) else img
+    out_image = image
+    if scale != 1.0:
+        out_image = upscale_image(image, scale, interpolation=interpolation)
+    if sharpen is not None:
+        out_image = sharpen_image(out_image, method=sharpen)
+    return out_image
 
-    fl = filename.lower()
-    if fl.endswith(".dds"):
-        proc = subprocess.Popen(f'nvddsinfo.exe "{os.path.join(args.source_dir, filename)}"', stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        info = parse_items(proc.stdout.read().decode().split("\n"))
+def blend(img1: Union[Image.Image, str], img2: Union[Image.Image, str], blend_rate: float = 0.5):
+    image1 = Image.open(img1) if isinstance(img1, str) else img1
+    image2 = Image.open(img2) if isinstance(img2, str) else img2
+    image2_w_alpha = apply_alpha_channel(image1, image2)
+    out_image = Image.blend(image1, image2_w_alpha, args.blend)
 
-        f_wo_ext = ".".join(filename.split(".")[:-1])
-            
-        if args.prescaled_dir:
-            path2 = os.path.join(args.prescaled_dir, f_wo_ext)
-            try:
-                path2 = get_path_w_ext(path2)
-            except IndexError:
-                if not args.silent:
-                    print(f"\"{f_wo_ext}\" not found in prescaled_dir. Skipping...")
-                return None
+    return out_image
 
-        tag = get_format_tag(info)
+def get_path_w_ext(base_path, extensions):
+    if isinstance(extensions, str):
+        extensions = (extensions,)
+    for extension in extensions:
+        path_with_extension = f"{base_path}.{extension}"
+        if os.path.exists(path_with_extension):
+            return path_with_extension
+    raise FileNotFoundError(f"No existing file found for \"{base_path}\" with any of the given extensions: {extensions}")
 
-        orig_path = os.path.join(args.source_dir, filename)
-        temp_subdir = os.path.join(args.temp_dir, tag)
+def process_file(path: str, args, config: dict):
+    if not os.path.splitext(path)[1].lower() == ".dds":
+        return None
+
+    relpath = os.path.relpath(path, args.source_dir)
+    info = get_dds_info(path)
+    is_cubemap = dict_get(info, "Caps.Caps 2.DDSCAPS2_CUBEMAP_ALL_FACES")
+    tag = get_format_tag(info)
+    
+    path2 = None
+    if args.prescaled_dir and not is_cubemap:
+        path2 = os.path.join(args.prescaled_dir, relpath)
         try:
-            os.makedirs(temp_subdir, exist_ok=True)
-        except ValueError as e:
+            path2 = get_path_w_ext(path2, ("dds", "png", "tiff", "jpg"))
+        except FileNotFoundError:
             if not args.silent:
-                print(e)
+                print(f"\"{os.path.splitext(relpath)[0]}\" not found in prescaled_dir. Skipping...")
             return None
 
-        path = os.path.join(temp_subdir, f_wo_ext + ".png")
+    orig_path = os.path.join(args.source_dir, relpath)
+    temp_subdir = os.path.join(args.temp_dir, tag)
+    path = os.path.join(temp_subdir, os.path.splitext(relpath)[0] + ".png")
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+    except ValueError as e:
+        if not args.silent:
+            print(e)
+        return None
 
-        decompress_arg = ""
-        if dict_get(info, "Caps.Caps 2.DDSCAPS2_CUBEMAP_ALL_FACES"):
-            decompress_arg += " -faces"
+    if args.skip and os.path.exists(path):
+        return tag
 
-        subprocess.run(f"nvdecompress.exe -format png {decompress_arg} \"{orig_path}\" \"{path}\"", stdout=subprocess.DEVNULL)
-            
-        image = Image.open(path)
-        out_image = upscale_image(image, args.scale, interpolation=config["upscale_method"])
-        if "sharpen_method" in config:
-            out_image = sharpen_image(out_image, method=config["sharpen_method"])
+    decompress(orig_path, path, tag, silent=args.silent)
 
-        if args.prescaled_dir:
-            image2 = Image.open(path2)
+    try:
+        process_file_(path, path2, args=args, tag=tag, config=config)
+    except FileNotFoundError:
+        if not args.silent:
+            print(f"\"{os.path.splitext(relpath)[0]}\" not found in prescaled_dir. Skipping...")
+        return None
+
+    return tag
+
+def process_file_(path: str, path2: Optional[str], *, args, tag: str, config: dict):
+    is_cubemap = tag.split("_")[-1] == "CUBEMAP"
+    if is_cubemap:
+        path_wo_ext = os.path.splitext(path)[0]
+        path2_wo_ext = os.path.splitext(path)[0] if path2 else None
+        raw_tag = "_".join(tag.split("_")[:-1])
+        temp_subdir = os.path.join(args.temp_dir, raw_tag)
+        get_face_addr = lambda path_wo_ext, i: get_path_w_ext(path_wo_ext + f"_face{i}", "png") if path_wo_ext else None
+        for p1, p2 in ((get_face_addr(path_wo_ext, i), get_face_addr(path2_wo_ext, i)) for i in range(6)):
+            process_file_(p1, p2, args=args, tag=raw_tag, config=config)
+    else:
+        out_image = process_image(path, args.scale, interpolation=config["upscale_method"], sharpen=config["sharpen_method"])
+        if path2:
             try:
-                image2 = apply_alpha_channel(out_image, image2)
-                out_image = Image.blend(out_image, image2, args.blend)
+                out_image = blend(out_image, path2, args.blend)
             except ValueError as e:
                 if not args.silent:
                     print(e)
-                return None
-
+                return;
         out_image.save(path, optimize=False)
-        return tag
+
+def transform_op(entity_addr: str, command: str, source_dir: str, target_dir: str, *, silent: bool = False):
+    is_file = os.path.isfile(entity_addr)
+    rel_p_ = os.path.relpath(entity_addr, source_dir)
+    tp_ = os.path.join(target_dir, rel_p_)
+    dirname = os.path.dirname(tp_) if is_file else tp_
+    os.makedirs(dirname, exist_ok=True)
+    command_str = command.format(in_path=entity_addr, out_path=tp_)
+    run_proc(command_str, silent=silent)
 
 
 if __name__ == "__main__":
@@ -492,50 +612,110 @@ if __name__ == "__main__":
 
     if args.sharpen:
         sharpen_method = get_sharpen_method(args.sharpen)
-        config = {
-            "sharpen_method": sharpen_method,
-            **config,
-        }
+    else:
+        sharpen_method = None
+    config = {
+        "sharpen_method": sharpen_method,
+        **config,
+    }
 
     os.makedirs(args.output_dir, exist_ok=True)
     os.makedirs(args.temp_dir, exist_ok=True)
 
-    fn_ = partial(decompress_and_scale, args=args, config=config)
-    if args.p == 1:
-        tags = set(fn_(filename) for filename in os.listdir(args.source_dir))
-    else:
-        args.silent = True
-        p_count = args.p if args.p > 0 else mp.cpu_count() - 1
-        with mp.Pool(p_count) as p:
-            tags = set(p.imap(fn_, os.listdir(args.source_dir), chunksize=5))
-    tags.discard(None)
-
-
-    for tag in tags:
-        temp_subdir = os.path.join(args.temp_dir, tag)
-        if tag == "DXT5_xGxR":
-            compress_str = f"crunch_x64.exe -quiet -renormalize -mipMode Generate -dxtQuality uber -DXT5_xGxR -fileformat dds  -file \"{temp_subdir}\\*\" -outdir \"{args.output_dir}\""
-        else:
-            if tag == "DXT1":
-                format = "bc1"
-            elif tag == "DXT3":
-                format = "bc2"
-            elif tag == "DXT5":
-                format = "bc3"
-            # elif tag == "RGB" or tag == "RGB_ALPHAPIXELS":
-            #    format = "rgb"
-            else:
-                if not args.silent:
-                    print(f"Input texture format \"{tag}\" not supported yet!")
-                continue;
-            compress_str = f"nvbatchcompress.exe -silent -{format} -mipfilter kaiser -production \"{temp_subdir}\" \"{args.output_dir}\""
-
-        run_proc(compress_str)
-
-        shutil.rmtree(os.path.abspath(temp_subdir))
-
     try:
-        os.rmdir(args.temp_dir)
-    except OSError as e:
-        if not args.silent:
-            print(e)
+
+        fn_ = partial(process_file, args=args, config=config)
+        if args.p == 1:
+            tags = set(map(fn_, scan_dir(args.source_dir, recurse=args.recurse)))
+        else:
+            p_count = args.p if args.p > 0 else mp.cpu_count() - 1
+            with mp.Pool(p_count) as p:
+                tags = set(p.imap_unordered(fn_, scan_dir(args.source_dir, recurse=args.recurse), chunksize=8))
+        tags.discard(None)
+        if not args.no_compress:
+            tags.update(tag.replace("_CUBEMAP", "") for tag in tags if tag.endswith("_CUBEMAP"))
+
+        for tag in sorted(tags)[::-1]:
+            try:
+                temp_subdir = os.path.join(args.temp_dir, tag)
+                is_cubemap = tag.endswith("_CUBEMAP")
+                if args.no_compress:
+                    temp_outdir = os.path.join(args.output_dir, os.path.relpath(temp_subdir, args.temp_dir))
+                    run_proc(f"robocopy /s /move /njh /njs /ndl \"{temp_subdir}\" \"{temp_outdir}\"", silent=args.silent)
+                else:
+                    if is_cubemap:
+                        t = tag.replace("_CUBEMAP", "")
+                        target_subdir = os.path.join(args.temp_dir, t)
+                        os.makedirs(target_subdir, exist_ok=True)
+                        mapgen_str = "CubeMapGen -exit -consoleErrorOutput -exportCubeDDS -exportPixelFormat:A8R8G8B8 -exportFilename:\"{out_path}.dds\""
+                        for i, (axis, side) in enumerate(product(('X', 'Y', 'Z'), ("Pos", "Neg"))):
+                            mapgen_str +=  f" -importFace{axis}{side}:\"" + "{in_path}_face" + str(i) + ".png\""
+
+                        fn_ = partial(transform_op, command=mapgen_str, source_dir=temp_subdir, target_dir=target_subdir, silent=args.silent)
+                    
+                        unique_files = frozenset(f_[:-10] for f_ in scan_dir(temp_subdir, recurse=args.recurse))
+                        if args.p == 1:
+                            for f in unique_files:
+                                fn_(f)
+                        else:
+                            with mp.Pool(p_count) as p:
+                                for _ in p.imap_unordered(fn_, unique_files, chunksize=3):
+                                    pass
+                    else:
+                        batch = False
+                        if tag == "DXT5_xGxR":
+                            compress_str = "crunch_x64 -quiet -renormalize -mipMode Generate -dxtQuality uber -DXT5_xGxR -fileformat dds  -file \"{in_path}\" -outdir \"{out_path}\""
+                            batch = True
+                        else:
+                            if tag == "DXT1":
+                                format = "bc1"
+                            elif tag == "DXT3":
+                                format = "bc2"
+                            elif tag == "DXT5":
+                                format = "bc3"
+                            elif tag == "RGB":
+                                format = "rgb"
+                            elif tag == "RGB_ALPHAPIXELS":
+                                format = "rgb -alpha"
+                            elif tag == "LUMINANCE":
+                                format = "lumi"
+                            else:
+                                if not args.silent:
+                                    print(f"Input texture format \"{t}\" not supported yet!")
+                                continue;
+                            compress_str = f"nvbatchcompress -silent -{format} -mipfilter kaiser -production " + "\"{in_path}\" \"{out_path}\""
+                            batch = True
+
+                        temp_outdir = os.path.join(temp_subdir, "compress_out_")
+                        os.makedirs(temp_outdir, exist_ok=True)
+                        fn_ = partial(transform_op, command=compress_str, source_dir=temp_subdir, target_dir=temp_outdir)
+
+                        if batch:
+                            if args.recurse:
+                                file_paths = flatten_dir(temp_subdir)
+                            fn_(temp_subdir)
+                            if args.recurse:
+                                file_paths_dds = dict(zip(map(lambda x: x[:-4] + ".dds", file_paths.keys()), file_paths.values()))
+                                unflatten_dir(temp_outdir, file_paths_dds)
+                                unflatten_dir(temp_subdir, file_paths)
+                        else:
+                            subdirs_g = scan_dir(temp_subdir, recurse=args.recurse, dirs=False)
+                            if args.p == 1:
+                                for d in subdirs_g:
+                                    fn_(d)
+                            else:
+                                with mp.Pool(p_count) as p:
+                                    for _ in p.imap_unordered(fn_, subdirs_g, chunksize=4):
+                                        pass
+
+                    run_proc(f"robocopy /s /move /njh /njs /ndl \"{temp_outdir}\" \"{args.output_dir}\"", silent=args.silent)
+            
+            finally:
+                if not args.keep:
+                    shutil.rmtree(temp_subdir, ignore_errors=True)
+    finally:
+        try:
+            os.rmdir(args.temp_dir)
+        except OSError as e:
+            if not args.silent:
+                print(e)
