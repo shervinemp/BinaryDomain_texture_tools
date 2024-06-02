@@ -1,6 +1,6 @@
-# Binary Domain Texture Modding Tools
+# Binary Domain Texture Modding
 
-This repository provides scripts to facilitate the modding of textures in the game **Binary Domain**. Follow the steps below to extract, edit, repack, restore, and clean up the game's texture files.
+This repository provides scripts to facilitate the modding of textures in the game **Binary Domain**. Follow the steps below to extract, edit, upscale, repack, restore, and clean up the game's texture files.
 
 ## Prerequisites
 
@@ -35,13 +35,42 @@ Use the `extract.bat` script to extract texture files from the game's PAR archiv
     extract.bat
     ```
 
-3. **Confirm Directory Structure**: When prompted, choose whether to create a corresponding directory structure under the modified directory by typing `Y` or `N`.
+3. **Confirm Directory Structure**: When prompted, choose whether to create a corresponding directory structure under the modified directory.
 
 This script processes `.par` files and extracts the contents into respective directories.
 
 ## Editing Textures
 
 Edit the extracted textures using your preferred image editing software.
+
+## Upscaling and Compressing Textures
+
+Use the `scale.py` script to upscale and compress textures. The script can be configured to perform either or both functions based on the provided arguments.
+
+### Usage
+
+```sh
+python scale.py source_dir output_dir [--prescaled_dir prescaled_dir] [--temp_dir temp_dir] [--interpolation interpolation] [--scale scale] [--blend blend] [--sharpen sharpen] [--silent] [--recurse] [--skip] [--keep] [--no_compress] [-p processes]
+```
+
+### Command-Line Arguments
+
+- `source_dir`: Directory containing input DDS files to be processed.
+- `output_dir`: Directory where the processed files will be written.
+- `--prescaled_dir`: Directory for pre-scaled images to blend with the upscaled images. To perform only compression, set this to a valid directory and use `--blend 1`.
+- `--temp_dir`: Directory for temporary files during processing (default: `.tmp`). This helps manage intermediate steps and ensures smooth operation.
+- `--interpolation`: Type of interpolation for upscaling (e.g., nearest, bilinear, bicubic) (default: `auto`). This determines the quality and method of upscaling.
+- `--scale`: Scale factor for upscaling (default: `2.0`). To avoid upscaling, set this to `1`.
+- `--blend`: Blending percentage for pre-scaled images (default: `0.5`). To perform only compression, set this to `1`.
+- `--sharpen`: Type of sharpening filter (e.g., unsharp_mask, CAS) to enhance image details.
+- `--silent`: Silences warnings and outputs for a cleaner execution.
+- `--recurse`: Recurse through input directories to process all nested files.
+- `--skip`: Skips overwriting temporary files, useful for resuming interrupted processes.
+- `--keep`: Keeps temporary files after processing, useful for debugging or additional processing steps.
+- `--no_compress`: Skips the compression step, useful if only upscaling is needed.
+- `-p`: Number of parallel processes to use (default: 1), which can speed up the processing time.
+
+By adjusting these options, you can flexibly and efficiently handle texture files to meet your specific requirements, whether you need upscaling, compression, or both.
 
 ## Repacking Textures
 
@@ -72,7 +101,6 @@ Use the `restore.bat` script to restore original texture files from backups.
     ```
 
 3. **Confirm Restoration**: Choose whether to restore all backups or one at a time.
-
 4. **Delete Backup Directory**: After restoring, confirm whether to delete the backup directory.
 
 This script restores the `.par` files to their original locations.
@@ -104,4 +132,4 @@ Upscaling some textures, especially those related to the main opening menu, may 
 
 ## Conclusion
 
-By following these instructions, you can customize the visuals of **Binary Domain** to your liking. Happy modding!
+By following these instructions, you can customize the visual elements of **Binary Domain** to your liking. Happy modding!
