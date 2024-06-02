@@ -12,11 +12,11 @@ call :process_dir "%cd%"
 goto :eof
 
 :process_dir (
-    for /r %1 %%F in (*.par) do (
+    for /r "%~1" %%F in (*.par) do (
         call :process_file "%%~fF"
     )
 
-    for /d %%D in ("%1\*") do (
+    for /d %%D in ("%~1\*") do (
         if not "%%~fD"=="%cd%" call :process_dir "%%~fD"
     )
     exit /b
