@@ -6,20 +6,16 @@ This repository provides scripts to facilitate the modding of textures in the ga
 
 Ensure the following tools are installed and added to your system `PATH`:
 
-1. **Crunch**  
-   [Download Crunch](https://github.com/BinomialLLC/crunch/raw/master/bin/crunch_x64.exe)  
+1. [**Crunch**](https://github.com/BinomialLLC/crunch/raw/master/bin/crunch_x64.exe)  
    Crunch is a command-line utility used for compressing and decompressing texture data. Add the directory containing `crunch_x64.exe` to your `PATH`.
 
-2. **NVIDIA Texture Tools Standalone App**  
-   [Download NVIDIA Texture Tools](https://developer.nvidia.com/downloads/texture-tools-standalone-app)  
+2. [**NVIDIA Texture Tools Standalone App**](https://developer.nvidia.com/downloads/texture-tools-standalone-app)  
    This application is used for creating, editing, and converting texture files. Add the directory of the main executable to your `PATH`.
 
-3. **CubeMapGen**  
-   [Download CubeMapGen](https://gpuopen.com/wp-content/uploads/2017/01/cubemapgen_v1.1.exe)  
+3. [**CubeMapGen**](https://gpuopen.com/wp-content/uploads/2017/01/cubemapgen_v1.1.exe)  
    CubeMapGen is a tool for generating and filtering cubemaps. Ensure the directory containing `cubemapgen_v1.1.exe` is added to your `PATH`.
 
-4. **ParManager**  
-   [Download ParManager](https://github.com/Kaplas80/ParManager/releases)  
+4. [**ParManager**](https://github.com/Kaplas80/ParManager/releases)  
    ParManager is a utility for managing PAR archives used in SEGA-developed games like the Yakuza series and Binary Domain. It supports listing, extracting, creating, deleting, and adding files to these archives. Add the directory of the main executable to your `PATH`.
 
 ## Extracting Textures
