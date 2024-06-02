@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion enableextensions
 
-set "par_tool=%~dp0\ParTool.exe"
+set "par_tool=ParTool.exe"
 set "par_tool_args=extract"
 
 call :full_path modified_dir "modified_"
@@ -12,7 +12,7 @@ call :process_dir "%cd%"
 goto :eof
 
 :process_dir (
-    for /r "%1" %%F in (*.par) do (
+    for /r %1 %%F in (*.par) do (
         call :process_file "%%~fF"
     )
 
