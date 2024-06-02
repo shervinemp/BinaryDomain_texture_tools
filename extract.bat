@@ -29,7 +29,8 @@ goto :eof
     set "output_dir=!file_path!_"
     set "outputm_dir=!file_path:%cd%=%modified_dir%!_"
 
-    mkdir "!output_dir!\.." 2>nul
+    for %%I in (!pathToCheck!) do set parentDir=%~dpI
+    if not exist "!parentDir!" mkdir "!parentDir!" 2>nul
     if /i "%confirm%"=="y" (
         mkdir "!outputm_dir!" 2>nul
     )
