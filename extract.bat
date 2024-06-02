@@ -15,10 +15,6 @@ goto :eof
     for /r "%~1" %%F in (*.par) do (
         call :process_file "%%~fF"
     )
-
-    for /d %%D in ("%~1\*") do (
-        if not "%%~fD"=="%cd%" call :process_dir "%%~fD"
-    )
     exit /b
 )
 
@@ -29,8 +25,6 @@ goto :eof
     set "output_dir=!file_path!_"
     set "outputm_dir=!file_path:%cd%=%modified_dir%!_"
 
-    for %%I in (!pathToCheck!) do set parentDir=%%~dpI
-    if not exist "!parentDir!" mkdir "!parentDir!" 2>nul
     if /i "%confirm%"=="y" (
         mkdir "!outputm_dir!" 2>nul
     )
