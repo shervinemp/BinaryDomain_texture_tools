@@ -468,24 +468,6 @@ def sharpen_image(image, method):
     return sharpened_image
 
 
-def apply_alpha_channel(source_img: Image.Image, dest_img: Image.Image) -> Image.Image:
-    # Check size
-    if source_img.size != dest_img.size:
-        raise ValueError(
-            f"Source and destination images must have the same size: {source_img.size} != {dest_img.size}"
-        )
-
-    out_img = dest_img.copy()
-
-    if "A" not in source_img.getbands():
-        return out_img  # Alpha channel not available in images
-
-    alpha_channel = source_img.getchannel("A")
-    out_img.putalpha(alpha_channel)
-
-    return out_img
-
-
 def normalize_channels(image, channels):
     channels = set(c.lower() for c in channels)
     bands = image.split()
@@ -649,10 +631,26 @@ def blend(
     img2: Union[Image.Image, str],
     blend_rate: float = 0.5,
 ):
-    image1 = Image.open(img1) if isinstance(img1, str) else img1
-    image2 = Image.open(img2) if isinstance(img2, str) else img2
-    image2_w_alpha = apply_alpha_channel(image1, image2)
-    out_image = Image.blend(image1, image2_w_alpha, args.blend)
+    if isinstance(img1, str):
+        img1 = Image.open(img1)
+        if os.path.exists((p := img1.split("."))[0] + "_alpha." + p[1]):
+            alpha = Image.open(p[0] + "_alpha." + p[1])
+            img1.putalpha(alpha)
+
+    if isinstance(img2, str):
+        img2 = Image.open(img2)
+        if os.path.exists((p := img2.split("."))[0] + "_alpha." + p[1]):
+            alpha = Image.open(p[0] + "_alpha." + p[1])
+            img2.putalpha(alpha)
+
+    has_alpha1 = "A" in img1.getbands()
+    has_alpha2 = "A" in img2.getbands()
+    if has_alpha1 and not has_alpha2:
+        img2.putalpha(img1.getchannel("A"))
+    elif has_alpha2 and not has_alpha1:
+        img1.putalpha(img2.getchannel("A"))
+
+    out_image = Image.blend(img1, img2, args.blend)
 
     return out_image
 
@@ -887,7 +885,7 @@ if __name__ == "__main__":
                                     )
                                 continue
                             compress_str = (
-                                f"nvcompress -silent -{format} -mipfilter kaiser -production "
+                                f"nvcompress -silent -{format} -mipfilter kaiser -production"
                                 + '"{in_path}" "{out_path}"'
                             )
                             batch = True
