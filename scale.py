@@ -611,13 +611,21 @@ def decompress(orig_path: str, target_path: str, tag: str, *, silent: bool = Fal
     )
 
 
+def load_image(path: str):
+    im = Image.open(path)
+    if os.path.exists((p := os.path.splitext(path))[0] + "_alpha." + p[1]):
+        alpha = Image.open(p[0] + "_alpha." + p[1])
+        im.putalpha(alpha)
+    return im
+
+
 def process_image(
     img: Union[Image.Image, str],
     scale: float,
     interpolation: InterpolationSettings,
     sharpen: Optional[SharpenSettings] = None,
 ):
-    image = Image.open(img) if isinstance(img, str) else img
+    image = load_image(img) if isinstance(img, str) else img
     out_image = image
     if scale != 1.0:
         out_image = upscale_image(image, scale, interpolation=interpolation)
@@ -631,17 +639,8 @@ def blend(
     img2: Union[Image.Image, str],
     blend_rate: float = 0.5,
 ):
-    if isinstance(img1, str):
-        img1 = Image.open(img1)
-        if os.path.exists((p := os.path.splitext(img1))[0] + "_alpha." + p[1]):
-            alpha = Image.open(p[0] + "_alpha." + p[1])
-            img1.putalpha(alpha)
-
-    if isinstance(img2, str):
-        img2 = Image.open(img2)
-        if os.path.exists((p := os.path.splitext(img2))[0] + "_alpha." + p[1]):
-            alpha = Image.open(p[0] + "_alpha." + p[1])
-            img2.putalpha(alpha)
+    img1 = load_image(img1) if isinstance(img1, str) else img1
+    img2 = load_image(img2) if isinstance(img2, str) else img2
 
     has_alpha1 = "A" in img1.getbands()
     has_alpha2 = "A" in img2.getbands()
