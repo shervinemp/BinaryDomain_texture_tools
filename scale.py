@@ -633,13 +633,13 @@ def blend(
 ):
     if isinstance(img1, str):
         img1 = Image.open(img1)
-        if os.path.exists((p := img1.split("."))[0] + "_alpha." + p[1]):
+        if os.path.exists((p := os.path.splitext(img1))[0] + "_alpha." + p[1]):
             alpha = Image.open(p[0] + "_alpha." + p[1])
             img1.putalpha(alpha)
 
     if isinstance(img2, str):
         img2 = Image.open(img2)
-        if os.path.exists((p := img2.split("."))[0] + "_alpha." + p[1]):
+        if os.path.exists((p := os.path.splitext(img2))[0] + "_alpha." + p[1]):
             alpha = Image.open(p[0] + "_alpha." + p[1])
             img2.putalpha(alpha)
 
