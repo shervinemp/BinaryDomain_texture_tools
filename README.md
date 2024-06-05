@@ -102,6 +102,6 @@ The script removes all directories with the suffix `.par_` except the modified d
 
 Launch the game to test your newly modded textures. Ensure everything appears as expected and make any necessary adjustments.
 
-## Important Note
+## Note
 
 Upscaling some textures, especially those related to the main menu, may cause the game to crash. Proceed with caution when modifying these textures.
