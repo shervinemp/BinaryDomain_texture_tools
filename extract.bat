@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion enableextensions
 set "par_tool=ParTool.exe"
 set "par_tool_args=extract"
 
-call :full_path modified_dir "modified_"
+call :full_path modified_dir "__modified"
 
 set /p "confirm=Do you want to make a mirror structure under the modified directory? (Y/N) "
 
@@ -13,17 +13,18 @@ goto :eof
 
 :process_dir (
     for /r "%~1" %%F in (*.par) do (
-        call :process_file "%%~fF"
+        call :process_file "%%F"
     )
     exit /b
 )
 
 :process_file (
-    set "file_path=%~1"
-    set "archive_name=%~n1"
-
-    set "output_dir=!file_path!_"
-    set "outputm_dir=!file_path:%cd%=%modified_dir%!_"
+    set "file_path=%~f1"
+    echo !file_path:%cd%=.!
+    
+    set "dir_name=%~nx1"
+    set "output_dir=!file_path:%dir_name%=_%dir_name%!"
+    set "outputm_dir=!output_dir:%cd%=%modified_dir%!"
 
     if /i "%confirm%"=="y" (
         mkdir "!outputm_dir!" 2>nul
@@ -31,9 +32,6 @@ goto :eof
 
     "%par_tool%" %par_tool_args% "!file_path!" "!output_dir!"
 
-    for /r "!output_dir!" %%G in (*.par) do (
-        call :process_file "%%~fG" "!output_dir!"
-    )
     exit /b
 )
 

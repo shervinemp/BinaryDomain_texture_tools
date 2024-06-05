@@ -1,71 +1,65 @@
 import os
 import shutil
 import subprocess
-from functools import partial
+
+from utils import get_par_dirs, run_proc
 
 PAR_TOOL = os.path.join(os.path.dirname(__file__), "ParTool.exe")
 PAR_TOOL_ARGS = "add -c 1"
-MODIFIED_DIR = os.path.abspath("modified_")
-TEMP_DIR = os.path.abspath(".modified_")
-BACKUP_DIR = os.path.abspath("backup_")
-
-echo = partial(print, end="")
+MODIFIED_DIR = os.path.abspath("__modified")
+TEMP_DIR = os.path.abspath("__tmp__")
+BACKUP_DIR = os.path.abspath("__backup")
 
 
-def run_proc(command_string):
-    with subprocess.Popen(
-        command_string, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    ) as prc:
-        while prc.poll() is None:
-            out = prc.stdout.readline()
-            echo(out.decode())
-        err = prc.stderr.read()
-        echo(err.decode())
-
-
-def update_file(dir_path, par_path, backup_path=None):
-    original_path = os.path.relpath(par_path, TEMP_DIR)
-
-    if not os.path.isfile(original_path):
-        raise ValueError(f'No file found at "{original_path}"')
-
+def backup(path):
+    rel_path = os.path.relpath(path, ".")
+    backup_path = os.path.join(BACKUP_DIR, rel_path)
     os.makedirs(os.path.dirname(backup_path), exist_ok=True)
     if not os.path.isfile(backup_path):
-        shutil.copy2(original_path, backup_path)
-
-    # execute the external program and capture the output
-    command_string = (
-        f'{PAR_TOOL} {PAR_TOOL_ARGS} "{backup_path}" "{dir_path}" "{par_path}"'
-    )
-    run_proc(command_string)
-
-
-def process_dir(dir_path):
-    has_files = set()
-    for root, dirs, files in os.walk(dir_path, topdown=False):
-        if files or root in has_files:
-            has_files.add(os.path.dirname(root))
-            has_files.discard(root)
-            if root.endswith(".par_"):
-                yield root
+        shutil.copy2(rel_path, backup_path)
 
 
 if __name__ == "__main__":
-    print(f'Copying files to "{TEMP_DIR}"...')
+
+    if os.path.exists(TEMP_DIR):
+        c = input(
+            f"The contents of {TEMP_DIR} must be cleared to avoid conflict. Would you like to proceed? (y/n) "
+        )
+        if c.lower() != "y":
+            shutil.rmtree(TEMP_DIR)
+        else:
+            exit()
+
+    print(f'Copying files to "{TEMP_DIR}" for processing...')
     shutil.copytree(MODIFIED_DIR, TEMP_DIR, dirs_exist_ok=True)
-    for dir_path in process_dir(TEMP_DIR):
-        dest_path = dir_path[:-1]
-        rel_path = os.path.relpath(dest_path, TEMP_DIR)
-        backup_path = os.path.join(BACKUP_DIR, rel_path)
-        print(f'Processing "{rel_path}"...')
+
+    for dir_path in get_par_dirs(TEMP_DIR):
+        dir_relpath = os.path.relpath(dir_path, TEMP_DIR)
+        # remove the leading underscore of the directory name
+        file_relpath = os.path.join((s := os.path.split(dir_relpath))[0], s[1][1:])
+
+        dest_path = os.path.join(TEMP_DIR, file_relpath)
+        backup_path = os.path.join(BACKUP_DIR, file_relpath)
+
+        print(f'Processing "{dir_relpath}"...')
         try:
-            update_file(dir_path, dest_path, backup_path)
+            if not os.path.isfile(file_relpath):
+                raise ValueError(f'No file found at "{file_relpath}"')
+
+            # execute the external program and capture the output
+            command_string = (
+                f'{PAR_TOOL} {PAR_TOOL_ARGS} "{backup_path}" "{dir_path}" "{dest_path}"'
+            )
+
+            backup(file_relpath)
+            run_proc(command_string)
         except ValueError as e:
             print(str(e))
         finally:
             shutil.rmtree(dir_path)
         print("")
-    print(f"Overwriting game files...")
+
+    print("Overwriting game files...")
     subprocess.run(
         f'robocopy /s /move /njh /njs /ndl "{TEMP_DIR}" .', stdout=subprocess.DEVNULL
     )

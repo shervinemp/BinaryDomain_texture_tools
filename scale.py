@@ -2,33 +2,36 @@ import numpy as np
 import cv2
 import os
 import argparse
-import multiprocessing as mp
-import subprocess
-import shutil
 from PIL import Image, ImageFilter
 from scipy.interpolate import CubicSpline
 from scipy.ndimage import zoom
-from functools import wraps, partial
-from itertools import product
+from functools import reduce, wraps, partial
 from typing import Optional, Union
 
+from utils import load_image, multiproc, scan_dir
 
 # Define command-line arguments
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "source_dir", help="path to the directory containing the input DDS files"
+    "output_dir",
+    help="path to the directory where the output files will be written",
 )
 parser.add_argument(
-    "output_dir", help="path to the directory where the output files will be written"
+    "source_dir",
+    nargs="+",
+    help="path to the directory containing PNG files",
 )
 parser.add_argument(
-    "--prescaled_dir",
-    help="path to the directory containing the already scaled images (these will be blended with the pre-scaled input images, if provided)",
+    "--blend",
+    type=float,
+    default=0.5,
+    help="blending percentage for pre-scaled images (only applies if --source2_dir is provided)",
 )
 parser.add_argument(
-    "--temp_dir",
-    default=".tmp",
-    help="path to the temporary directory where temporary images are saved",
+    "--scale",
+    type=float,
+    default=2.0,
+    help="scale factor for upscaling",
 )
 parser.add_argument(
     "--interpolation",
@@ -49,22 +52,10 @@ parser.add_argument(
     help="type of interpolation to use for upscaling (default: %(default)s)",
 )
 parser.add_argument(
-    "--scale", type=float, default=2.0, help="scale factor for upscaling"
-)
-parser.add_argument(
-    "--blend",
-    type=float,
-    default=0.5,
-    help="blending percentage for pre-scaled images (only applies if --prescaled_dir is used)",
-)
-parser.add_argument(
     "--sharpen",
     choices=["unsharp_mask", "cas"],
     default=None,
     help="type of sharpening filter to apply after upscaling",
-)
-parser.add_argument(
-    "--silent", action="store_true", default=False, help="silences warnings and outputs"
 )
 parser.add_argument(
     "--recurse",
@@ -73,22 +64,16 @@ parser.add_argument(
     help="recurse down the input directories",
 )
 parser.add_argument(
+    "--silent",
+    action="store_true",
+    default=False,
+    help="silences warnings and outputs",
+)
+parser.add_argument(
     "--skip",
     action="store_true",
     default=False,
     help="skips overwriting temporary files.",
-)
-parser.add_argument(
-    "--keep",
-    action="store_true",
-    default=False,
-    help="keeps temporary files after operation.",
-)
-parser.add_argument(
-    "--no_compress",
-    action="store_true",
-    default=False,
-    help="do not compress the processed files.",
 )
 parser.add_argument(
     "-p",
@@ -96,15 +81,6 @@ parser.add_argument(
     default=1,
     help="the number of processes (forces the process to be silent if p > 1, default: %(default)s)",
 )
-
-is_tool = lambda name: shutil.which(name) is not None
-
-# HAS_TEXCONV = is_tool("texconv")
-# HAS_TEXASSEMBLE = is_tool("texassemble")
-HAS_NVTT = is_tool("nvcompress")
-HAS_ATI_MAPGEN = is_tool("CubeMapGen")
-# HAS_TEXASSEMBLE = is_tool("texassemble")
-HAS_CRUNCH = is_tool("crunch_x64")
 
 
 class InterpolationSettings:
@@ -124,60 +100,6 @@ class InterpolationSettings:
 class SharpenSettings:
     UnsharpMask = 0
     CAS = 1
-
-
-def scan_dir(path: str, recurse: bool = False, dirs: bool = False):
-    for entry in os.scandir(path):
-        if entry.is_file():
-            if not dirs:
-                yield entry.path
-        else:
-            if dirs and len(next(os.walk(entry))[2]):
-                yield entry.path
-            yield from scan_dir(entry.path, recurse=recurse, dirs=dirs)
-
-
-def flatten_dir(directory):
-    index = 0
-    file_paths = {}
-    for root, _, files in os.walk(directory):
-        for filename in files:
-            new_filename = f"{index}_{filename}"
-            index += 1
-            src_path = os.path.join(root, filename)
-            file_paths[new_filename] = os.path.relpath(root, directory)
-            dest_path = os.path.join(directory, new_filename)
-            shutil.move(src_path, dest_path)
-    for root, dirs, _ in os.walk(directory, topdown=False):
-        for dir in dirs:
-            dir_path = os.path.join(root, dir)
-            try:
-                os.rmdir(dir_path)
-            except OSError:
-                pass
-    return file_paths
-
-
-def unflatten_dir(directory, file_paths):
-    for filename, orig_dir in file_paths.items():
-        orig_filename = filename.split("_", 1)[1]
-        dest_dir = os.path.join(directory, orig_dir)
-        dest_path = os.path.join(dest_dir, orig_filename)
-        os.makedirs(dest_dir, exist_ok=True)
-        shutil.move(os.path.join(directory, filename), dest_path)
-
-
-def run_proc(command: str, *, silent: bool = False):
-    # execute the external program and capture the output
-    echo = partial(print, end="")
-    stdout = subprocess.DEVNULL if silent else subprocess.PIPE
-    with subprocess.Popen(command, stdout=stdout, stderr=subprocess.PIPE) as prc:
-        if not silent:
-            while prc.poll() is None:
-                out = prc.stdout.readline()
-                echo(out.decode())
-        err = prc.stderr.read()
-        echo(err.decode())
 
 
 def pil_to_numpy(func):
@@ -515,125 +437,6 @@ def get_sharpen_method(sharpen_arg):
     return sharpening
 
 
-def parse_items(lines, *, return_count=False):
-    lines = list(filter(len, lines))
-    info = {}
-    lines_parsed = 0
-    while len(lines):
-        h = 1
-        if ":" in lines[0]:
-            item = list(filter(len, (x.strip() for x in lines[0].split(":"))))
-            if len(lines) > 1 and any(lines[1].startswith(ws) for ws in ("\t", " ")):
-                ws = lines[1][0]
-                w = 1
-                for c in lines[1][1:]:
-                    if c == ws:
-                        w += 1
-                    else:
-                        break
-                indent = ws * w
-                for l in lines[1:]:
-                    if l.startswith(indent):
-                        h += 1
-                    else:
-                        break
-                parsed, _ = parse_items([x[w:] for x in lines[1:h]], return_count=True)
-                if len(item) == 1 and h:
-                    info[item[0]] = parsed
-                else:
-                    info[item[0]] = (item[1], parsed)
-            else:
-                if len(item) == 1:
-                    info[item[0]] = {}
-                else:
-                    v = item[1]
-                    info[item[0]] = int(v) if v.isnumeric() else v
-        else:
-            info[lines[0].strip()] = True
-        lines_parsed += h
-        lines = lines[h:]
-    return (info, lines_parsed) if return_count else info
-
-
-def get_dds_info(path: str):
-    proc = subprocess.Popen(
-        f'nvddsinfo "{path}"', stdin=subprocess.PIPE, stdout=subprocess.PIPE
-    )
-    info = parse_items(proc.stdout.read().decode().split("\n"))
-    return info
-
-
-def dict_get(d: dict, path: str):
-    path = path.split(".")
-    for i, k in enumerate(path):
-        if k not in d:
-            return None
-        d = d[k]
-        if isinstance(d, tuple) and len(d) == 2:
-            if i + 1 != len(path):
-                d = d[1]
-    return d
-
-
-def get_format_tag(info: dict):
-    flags = dict_get(info, "Pixel Format.Flags")[1]
-    tag_list = []
-    if "DDPF_FOURCC" in flags:
-        fourcc = dict_get(info, "Pixel Format.FourCC")
-        tag_list.append(fourcc.split()[0].strip("'"))
-    else:
-        formats = [f.split("DDPF_")[-1] for f in flags.keys()]
-        tag_list.extend(formats)
-    swizzle = dict_get(info, "Pixel Format.Swizzle")
-    if swizzle is not None:
-        tag_list.append(swizzle.split()[0].strip("'"))
-    if dict_get(info, "Caps.Caps 2.DDSCAPS2_CUBEMAP_ALL_FACES"):
-        tag_list.append("CUBEMAP")
-
-    tag = "_".join(tag_list)
-
-    return tag
-
-
-def decompress(orig_path: str, target_path: str, tag: str, *, silent: bool = False):
-    decompress_args = []
-    is_cubemap = tag.split("_")[-1] == "CUBEMAP"
-    if is_cubemap:
-        tag = "_".join(tag.split("_")[:-1])
-        decompress_args.append("-faces")
-    if tag == "DXT5_xGxR":
-        decompress_args.append("-forcenormal")
-    d_arg_str = " ".join(decompress_args)
-
-    run_proc(
-        f'nvdecompress -format png {d_arg_str} "{orig_path}" "{target_path}"',
-        silent=silent,
-    )
-
-
-def load_image(path: str):
-    im = Image.open(path)
-    if os.path.exists((p := os.path.splitext(path))[0] + "_alpha." + p[1]):
-        alpha = Image.open(p[0] + "_alpha." + p[1])
-        im.putalpha(alpha)
-    return im
-
-
-def process_image(
-    img: Union[Image.Image, str],
-    scale: float,
-    interpolation: InterpolationSettings,
-    sharpen: Optional[SharpenSettings] = None,
-):
-    image = load_image(img) if isinstance(img, str) else img
-    out_image = image
-    if scale != 1.0:
-        out_image = upscale_image(image, scale, interpolation=interpolation)
-    if sharpen is not None:
-        out_image = sharpen_image(out_image, method=sharpen)
-    return out_image
-
-
 def blend(
     img1: Union[Image.Image, str],
     img2: Union[Image.Image, str],
@@ -654,113 +457,54 @@ def blend(
     return out_image
 
 
-def get_path_w_ext(base_path, extensions):
-    if isinstance(extensions, str):
-        extensions = (extensions,)
-    for extension in extensions:
-        path_with_extension = f"{base_path}.{extension}"
-        if os.path.exists(path_with_extension):
-            return path_with_extension
-    raise FileNotFoundError(
-        f'No existing file found for "{base_path}" with any of the given extensions: {extensions}'
-    )
+def process_image(
+    img: Union[Image.Image, str],
+    scale: float,
+    interpolation: InterpolationSettings,
+    sharpen: Optional[SharpenSettings] = None,
+):
+    image = load_image(img) if isinstance(img, str) else img
+    out_image = image
+    if scale != 1.0:
+        out_image = upscale_image(image, scale, interpolation=interpolation)
+    if sharpen is not None:
+        out_image = sharpen_image(out_image, method=sharpen)
+    return out_image
 
 
 def process_file(path: str, args, config: dict):
-    if not os.path.splitext(path)[1].lower() == ".dds":
-        return None
+    relpath = os.path.relpath(path, args.source_dir[0])
+    dest_path = os.path.join(args.output_dir, relpath)
+    paths_ = [
+        p for d in args.source_dir if os.path.exists(p := os.path.join(d, relpath))
+    ]
 
-    relpath = os.path.relpath(path, args.source_dir)
-    info = get_dds_info(path)
-    is_cubemap = dict_get(info, "Caps.Caps 2.DDSCAPS2_CUBEMAP_ALL_FACES")
-    tag = get_format_tag(info)
-
-    path2 = None
-    if args.prescaled_dir and not is_cubemap:
-        path2 = os.path.join(args.prescaled_dir, relpath)
-        try:
-            path2 = get_path_w_ext(path2, ("dds", "png", "tiff", "jpg"))
-        except FileNotFoundError:
-            if not args.silent:
-                print(
-                    f'"{os.path.splitext(relpath)[0]}" not found in prescaled_dir. Skipping...'
-                )
-            return None
-
-    orig_path = os.path.join(args.source_dir, relpath)
-    temp_subdir = os.path.join(args.temp_dir, tag)
-    path = os.path.join(temp_subdir, os.path.splitext(relpath)[0] + ".png")
     try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
     except ValueError as e:
         if not args.silent:
             print(e)
         return None
 
-    if args.skip and os.path.exists(path):
-        return tag
-
-    decompress(orig_path, path, tag, silent=args.silent)
-
-    try:
-        process_file_(path, path2, args=args, tag=tag, config=config)
-    except FileNotFoundError:
-        if not args.silent:
-            print(
-                f'"{os.path.splitext(relpath)[0]}" not found in prescaled_dir. Skipping...'
-            )
-        return None
-
-    return tag
-
-
-def process_file_(path: str, path2: Optional[str], *, args, tag: str, config: dict):
-    is_cubemap = tag.split("_")[-1] == "CUBEMAP"
-    if is_cubemap:
-        path_wo_ext = os.path.splitext(path)[0]
-        path2_wo_ext = os.path.splitext(path)[0] if path2 else None
-        raw_tag = "_".join(tag.split("_")[:-1])
-        # temp_subdir = os.path.join(args.temp_dir, raw_tag)
-        get_face_addr = lambda path_wo_ext, i: (
-            get_path_w_ext(path_wo_ext + f"_face{i}", "png") if path_wo_ext else None
+    imgs = [load_image(p) for p in paths_]
+    min_size = np.min([img.size for img in imgs], axis=0)
+    scaled = [
+        process_image(
+            img,
+            args.scale / (img.size[0] / min_size[0]),  # scale to max size
+            config["upscale_method"],
+            config["sharpen_method"],
         )
-        for p1, p2 in (
-            (get_face_addr(path_wo_ext, i), get_face_addr(path2_wo_ext, i))
-            for i in range(6)
-        ):
-            process_file_(p1, p2, args=args, tag=raw_tag, config=config)
-    else:
-        out_image = process_image(
-            path,
-            args.scale,
-            interpolation=config["upscale_method"],
-            sharpen=config["sharpen_method"],
-        )
-        if path2:
-            try:
-                out_image = blend(out_image, path2, args.blend)
-            except ValueError as e:
-                if not args.silent:
-                    print(e)
-                return
-        out_image.save(path, optimize=False)
-
-
-def transform_op(
-    entity_addr: str,
-    command: str,
-    source_dir: str,
-    target_dir: str,
-    *,
-    silent: bool = False,
-):
-    is_file = os.path.isfile(entity_addr)
-    rel_p_ = os.path.relpath(entity_addr, source_dir)
-    tp_ = os.path.join(target_dir, rel_p_)
-    dirname = os.path.dirname(tp_) if is_file else tp_
-    os.makedirs(dirname, exist_ok=True)
-    command_str = command.format(in_path=entity_addr, out_path=tp_)
-    run_proc(command_str, silent=silent)
+        for img in imgs
+    ]
+    _, blended = reduce(
+        lambda x, y: (
+            (zi := y[0] + 1),
+            blend(x[1], y[1], blend_rate=1 - args.blend * 2 / zi),
+        ),
+        enumerate(scaled),
+    )
+    blended.save(dest_path, optimize=False)
 
 
 if __name__ == "__main__":
@@ -789,155 +533,5 @@ if __name__ == "__main__":
     os.makedirs(args.output_dir, exist_ok=True)
     os.makedirs(args.temp_dir, exist_ok=True)
 
-    try:
-
-        fn_ = partial(process_file, args=args, config=config)
-        if args.p == 1:
-            tags = set(map(fn_, scan_dir(args.source_dir, recurse=args.recurse)))
-        else:
-            p_count = args.p if args.p > 0 else mp.cpu_count() - 1
-            with mp.Pool(p_count) as p:
-                tags = set(
-                    p.imap_unordered(
-                        fn_,
-                        scan_dir(args.source_dir, recurse=args.recurse),
-                        chunksize=8,
-                    )
-                )
-        tags.discard(None)
-        if not args.no_compress:
-            tags.update(
-                tag.replace("_CUBEMAP", "") for tag in tags if tag.endswith("_CUBEMAP")
-            )
-
-        for tag in sorted(tags)[::-1]:
-            try:
-                temp_subdir = os.path.join(args.temp_dir, tag)
-                is_cubemap = tag.endswith("_CUBEMAP")
-                if args.no_compress:
-                    temp_outdir = os.path.join(
-                        args.output_dir, os.path.relpath(temp_subdir, args.temp_dir)
-                    )
-                    run_proc(
-                        f'robocopy /s /move /njh /njs /ndl "{temp_subdir}" "{temp_outdir}"',
-                        silent=args.silent,
-                    )
-                else:
-                    if is_cubemap:
-                        t = tag.replace("_CUBEMAP", "")
-                        target_subdir = os.path.join(args.temp_dir, t)
-                        os.makedirs(target_subdir, exist_ok=True)
-                        mapgen_str = 'CubeMapGen -exit -consoleErrorOutput -exportCubeDDS -exportPixelFormat:A8R8G8B8 -exportFilename:"{out_path}.dds"'
-                        for i, (axis, side) in enumerate(
-                            product(("X", "Y", "Z"), ("Pos", "Neg"))
-                        ):
-                            mapgen_str += (
-                                f' -importFace{axis}{side}:"'
-                                + "{in_path}_face"
-                                + str(i)
-                                + '.png"'
-                            )
-
-                        fn_ = partial(
-                            transform_op,
-                            command=mapgen_str,
-                            source_dir=temp_subdir,
-                            target_dir=target_subdir,
-                            silent=args.silent,
-                        )
-
-                        unique_files = frozenset(
-                            f_[:-10]
-                            for f_ in scan_dir(temp_subdir, recurse=args.recurse)
-                        )
-                        if args.p == 1:
-                            for f in unique_files:
-                                fn_(f)
-                        else:
-                            with mp.Pool(p_count) as p:
-                                for _ in p.imap_unordered(
-                                    fn_, unique_files, chunksize=3
-                                ):
-                                    pass
-                    else:
-                        batch = False
-                        if tag == "DXT5_xGxR":
-                            compress_str = 'crunch_x64 -quiet -renormalize -mipMode Generate -dxtQuality uber -DXT5_xGxR -fileformat dds  -file "{in_path}" -outdir "{out_path}"'
-                            batch = True
-                        else:
-                            if tag == "DXT1":
-                                format = "bc1"
-                            elif tag == "DXT3":
-                                format = "bc2"
-                            elif tag == "DXT5":
-                                format = "bc3"
-                            elif tag == "RGB":
-                                format = "rgb"
-                            elif tag == "RGB_ALPHAPIXELS":
-                                format = "rgb -alpha"
-                            elif tag == "LUMINANCE":
-                                format = "lumi"
-                            else:
-                                if not args.silent:
-                                    print(
-                                        f'Input texture format "{t}" not supported yet!'
-                                    )
-                                continue
-                            compress_str = (
-                                f"nvcompress -silent -{format} -mipfilter kaiser -production"
-                                + '"{in_path}" "{out_path}"'
-                            )
-                            batch = True
-
-                        temp_outdir = os.path.join(temp_subdir, "compress_out_")
-                        os.makedirs(temp_outdir, exist_ok=True)
-                        fn_ = partial(
-                            transform_op,
-                            command=compress_str,
-                            source_dir=temp_subdir,
-                            target_dir=temp_outdir,
-                        )
-
-                        if batch:
-                            if args.recurse:
-                                file_paths = flatten_dir(temp_subdir)
-                            fn_(temp_subdir)
-                            if args.recurse:
-                                file_paths_dds = dict(
-                                    zip(
-                                        map(
-                                            lambda x: x[:-4] + ".dds", file_paths.keys()
-                                        ),
-                                        file_paths.values(),
-                                    )
-                                )
-                                unflatten_dir(temp_outdir, file_paths_dds)
-                                unflatten_dir(temp_subdir, file_paths)
-                        else:
-                            subdirs_g = scan_dir(
-                                temp_subdir, recurse=args.recurse, dirs=False
-                            )
-                            if args.p == 1:
-                                for d in subdirs_g:
-                                    fn_(d)
-                            else:
-                                with mp.Pool(p_count) as p:
-                                    for _ in p.imap_unordered(
-                                        fn_, subdirs_g, chunksize=4
-                                    ):
-                                        pass
-
-                    run_proc(
-                        f'robocopy /s /move /njh /njs /ndl "{temp_outdir}" "{args.output_dir}"',
-                        silent=args.silent,
-                    )
-
-            finally:
-                if not args.keep:
-                    shutil.rmtree(temp_subdir, ignore_errors=True)
-    finally:
-        try:
-            os.rmdir(args.temp_dir)
-        except OSError as e:
-            if not args.silent:
-                print(e)
+    fn_ = partial(process_file, args=args, config=config)
+    multiproc(fn_, scan_dir(args.source_dir[0], recurse=args.recurse), args.p)
