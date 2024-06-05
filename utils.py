@@ -64,7 +64,7 @@ def transform_op(
 def load_image(path: str):
     im = Image.open(path)
     if os.path.exists((p := os.path.splitext(path))[0] + "_alpha." + p[1]):
-        alpha = Image.open(p[0] + "_alpha." + p[1])
+        alpha = Image.open(p[0] + "_alpha." + p[1]).convert("L")
         im.putalpha(alpha)
     return im
 
