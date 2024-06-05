@@ -46,7 +46,7 @@ Optionally, use the `python scale.py` script to upscale, sharpen and blend image
 
 ## Compressing Textures
 
-Use `convert.py compress` to compress the PNG files into DDS.
+Use `python convert.py compress` to compress the PNG files into DDS.
 
 ## Repacking Textures
 
