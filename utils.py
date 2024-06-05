@@ -13,9 +13,12 @@ def is_path_var(name):
     return shutil.which(name) is not None
 
 
-def run_proc(command_string):
+def run_proc(command_string, silent=False):
     with subprocess.Popen(
-        command_string, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        command_string,
+        stdout=subprocess.DEVNULL if silent else subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True,
     ) as prc:
         while prc.poll() is None:
             out = prc.stdout.readline()

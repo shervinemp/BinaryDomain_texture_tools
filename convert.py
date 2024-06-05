@@ -30,7 +30,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "output_dir",
-    default=None,
+    default=".",
     help="path to the directory where the output files will be written (default: current directory)",
 )
 parser.add_argument(
@@ -61,10 +61,12 @@ def decompress_op(orig_path: str, target_path: str, tag: str, *, silent: bool = 
     is_cubemap = tag.split("_")[-1] == "CUBEMAP"
     if is_cubemap:
         decompress_args.append("-faces")
-    if tag[: tag.rfind("_")] == "DXT5_xGxR":
+        tag = tag[: tag.rfind("_")]
+    if tag == "DXT5_xGxR":
         decompress_args.append("-forcenormal")
     d_arg_str = " ".join(decompress_args)
 
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
     run_proc(
         f'nvdecompress -format png {d_arg_str} "{orig_path}" "{target_path}"',
         silent=silent,
@@ -85,6 +87,7 @@ def decompress(path: str, args):
 
     if args.skip and os.path.exists(path):
         print(f'"{os.path.splitext(relpath)[0]}" already exists. Skipping...')
+        return
 
     decompress_op(path, dest_path, tag, silent=args.silent)
 
@@ -193,7 +196,7 @@ if __name__ == "__main__":
             print("Make sure you have NVIDIA Texture Tools installed and in your PATH.")
             exit()
         fn_ = partial(decompress, args=args)
-        multiproc(fn_, args.source_dir, args.p, args.recurse)
+        multiproc(fn_, scan_dir(args.source_dir, recurse=args.recurse), args.p)
     else:
         if not is_path_var("nvcompress"):
             print("Make sure you have NVIDIA Texture Tools installed and in your PATH.")
