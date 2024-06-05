@@ -67,8 +67,12 @@ def decompress_op(orig_path: str, target_path: str, tag: str, *, silent: bool = 
     d_arg_str = " ".join(decompress_args)
 
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    abs_p = os.path.abspath
+    print(
+        f'nvdecompress -format png {d_arg_str} "{abs_p(orig_path)}" "{abs_p(target_path)}"'
+    )
     run_proc(
-        f'nvdecompress -format png {d_arg_str} "{orig_path}" "{target_path}"',
+        f'nvdecompress -format png {d_arg_str} "{abs_p(orig_path)}" "{abs_p(target_path)}"',
         silent=silent,
     )
 
@@ -152,22 +156,21 @@ def compress_batch(tag_dir: str, args):
                     print(f'Input texture format "{tag}" not supported yet!')
 
             compress_str = (
-                f"nvcompress -silent -{format} -mipfilter kaiser -production"
+                f"nvcompress -silent -{format} -mipfilter kaiser -production "
                 + '"{in_path}" "{out_path}"'
             )
-
-        temp_outdir = os.path.join(dest_subdir, "__tmp__")
-        os.makedirs(temp_outdir, exist_ok=True)
-        transform_op(
+        fn_ = partial(
+            transform_op,
             file_addr=tag_dir,
             command=compress_str,
             source_dir=tag_dir,
-            target_dir=temp_outdir,
         )
 
+        temp_outdir = os.path.join(dest_subdir, "__tmp__")
+        os.makedirs(temp_outdir, exist_ok=True)
         if args.recurse:
             file_paths = flatten_dir(temp_outdir)
-        fn_(temp_outdir)
+        fn_(target_dir=temp_outdir)
         if args.recurse:
             file_paths_dds = dict(
                 zip(
