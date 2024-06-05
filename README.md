@@ -105,7 +105,3 @@ Launch the game to test your newly modded textures. Ensure everything appears as
 ## Important Note
 
 Upscaling some textures, especially those related to the main menu, may cause the game to crash. Proceed with caution when modifying these textures.
-
-## Conclusion
-
-By following these instructions, you can customize the visual elements of **Binary Domain** to your liking. Happy modding!
