@@ -24,8 +24,15 @@ goto :eof
     
     set "dir_name=%~nx1"
     set "output_dir=!file_path:%dir_name%=_%dir_name%!"
-    set "outputm_dir=!output_dir:%cd%=%modified_dir%!"
+    if exist "!output_dir!" (
+        set /p "confirm=!output_dir! already exists. Continuing this operation will delete the existing directory. Do you want to continue? (Y/N) "
+        if /i "%confirm%"=="n" (
+            exit /b
+        )
+        rmdir /s /q "!output_dir!"
+    )
 
+    set "outputm_dir=!output_dir:%cd%=%modified_dir%!"
     if /i "%confirm%"=="y" (
         mkdir "!outputm_dir!" 2>nul
     )
