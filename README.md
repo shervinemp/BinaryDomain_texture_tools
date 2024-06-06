@@ -105,3 +105,9 @@ Launch the game to test your newly modded textures. Ensure everything appears as
 ## Note
 
 Upscaling some textures, especially those related to the main menu, may cause the game to crash. Proceed with caution when modifying these textures.
+
+## Future plans
+
+1. See if [**dx-disassembler**](https://github.com/theturboturnip/dx-disassembler/) works with Binary Domain shader files.
+
+2. See if [**SonicAudioTools**](https://github.com/blueskythlikesclouds/SonicAudioTools/) works with Binary Domain csb files.
