@@ -19,9 +19,8 @@ set "modified=__modified\"
 set "unstaged=__unstaged\"
 
 for %%i in (%*) do (
-    set "file=%%~i"
-    if exist "!file!\nul" set "file=!file:~0,-1!"
-    for %%j in ("!file!") do set "file=%%~fj"
+    set "file=%%~fi"
+    if "!file:~-1!"=="\" set "file=!file:~0,-1!"
 
     set "wo_mod=!file:%modified%=!"
     set "wo_usg=!file:%unstaged%=!"
@@ -36,11 +35,11 @@ for %%i in (%*) do (
     )
 
     if exist "%file_dest%" (
-        set /p "confirm=!file_dest! already exists.
+        set /p "confirm=!file_dest! already exists."
         exit /b
     )
 
-    for %%j in ("!file_dest!") do set "dir_dest=%%~dpj"
+    for %%j in ("%file_dest%") do set "dir_dest=%%~dpj"
     if exist "%file%\" (
         mkdir "!file_dest!" 2>nul
         robocopy "!file!" "!file_dest!" /e /move
