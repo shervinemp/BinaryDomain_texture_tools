@@ -14,11 +14,11 @@ if /i "%confirm%"=="y" (
             set "backup_path=%%~fd"
             set "backup_name=%%~nd"
 
-            if /i "!confirm_all!"=="n" (
+            if /i "%confirm_all%"=="n" (
                 set /p "confirm_one=Do you want to restore !backup_name!? (Y/N) "
             )
 
-            if /i "!confirm_one!"=="y" (
+            if /i "%confirm_one%"=="y" (
                 set "file_path=!backup_path:%backup_dir%=%cd%!"
 
                 copy /y "%%d" "!file_path!"
