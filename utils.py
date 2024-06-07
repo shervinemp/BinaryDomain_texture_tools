@@ -116,7 +116,7 @@ def flatten_dir(directory):
             src_path = os.path.join(root, filename)
             file_paths[new_filename] = os.path.relpath(root, directory)
             dest_path = os.path.join(directory, new_filename)
-            shutil.move(src_path, dest_path)
+            os.rename(src_path, dest_path)
     for root, dirs, _ in os.walk(directory, topdown=False):
         for dir in dirs:
             dir_path = os.path.join(root, dir)
@@ -134,7 +134,7 @@ def unravel_dir(directory, file_paths):
         dest_dir = os.path.join(directory, orig_dir)
         dest_path = os.path.join(dest_dir, orig_filename)
         os.makedirs(dest_dir, exist_ok=True)
-        shutil.move(os.path.join(directory, filename), dest_path)
+        os.rename(os.path.join(directory, filename), dest_path)
 
 
 def get_format_tag(info: dict):

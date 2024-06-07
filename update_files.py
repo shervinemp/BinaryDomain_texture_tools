@@ -44,14 +44,14 @@ if __name__ == "__main__":
             *r_[2:],
             s_[1][1:],
         )
+        if not os.path.isfile(file_relpath):
+            raise ValueError(f'No file found at "{file_relpath}"')
 
-        dest_path = os.path.join(TEMP_DIR, file_relpath)
         backup_path = os.path.join(BACKUP_DIR, file_relpath)
+        dest_path = os.path.join(TEMP_DIR, file_relpath)
 
         print(f'Processing "{dir_relpath}"...')
         try:
-            if not os.path.isfile(file_relpath):
-                raise ValueError(f'No file found at "{file_relpath}"')
 
             # execute the external program and capture the output
             command_string = (
@@ -59,11 +59,6 @@ if __name__ == "__main__":
             )
 
             backup(file_relpath)
-
-            # remove destpath if it exists
-            if os.path.exists(dest_path):
-                os.remove(dest_path)
-
             run_proc(command_string)
         except ValueError as e:
             print(str(e))

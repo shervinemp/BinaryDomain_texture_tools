@@ -61,7 +61,7 @@ After editing, repack the textures into the game's PAR archives using the `updat
     python update_files.py
     ```
 
-This script copies the modified files (under `__modified`) to a temporary directory (`__tmp__`), creates updated `.par` files, and overwrites the game files.
+This script pushes the modified files (under `__modified`) into the `.par` files. This operation requires the nested `.par` files created during extraction.
 
 ## Restoring Backups
 
