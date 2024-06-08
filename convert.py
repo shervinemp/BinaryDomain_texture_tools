@@ -68,9 +68,6 @@ def decompress_op(orig_path: str, target_path: str, tag: str, *, silent: bool = 
 
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
     abs_p = os.path.abspath
-    print(
-        f'nvdecompress -format png {d_arg_str} "{abs_p(orig_path)}" "{abs_p(target_path)}"'
-    )
     run_proc(
         f'nvdecompress -format png {d_arg_str} "{abs_p(orig_path)}" "{abs_p(target_path)}"',
         silent=silent,
