@@ -36,14 +36,8 @@ if __name__ == "__main__":
     for dir_path in get_par_dirs(TEMP_DIR):
         dir_relpath = os.path.relpath(dir_path, TEMP_DIR)
 
-        # remove the leading underscore of the directory name and also the tag directories.
-        s_ = os.path.split(dir_relpath)
-        r_ = s_[0].split(os.sep)
-        file_relpath = os.path.join(
-            r_[0],
-            *r_[2:],
-            s_[1][1:],
-        )
+        # remove the leading underscore of the directory name.
+        file_relpath = os.path.join((s_ := os.path.split(dir_relpath))[0], s_[1][1:])
         if not os.path.isfile(file_relpath):
             raise ValueError(f'No file found at "{file_relpath}"')
 

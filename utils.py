@@ -80,6 +80,10 @@ def scan_dir(path: str, recurse: bool = False, return_dirs: bool = False):
             yield from scan_dir(entry.path, recurse=recurse, return_dirs=return_dirs)
 
 
+def is_par_dir(path):
+    return (s_ := os.path.basename(path)).startswith("_") and s_.endswith(".par")
+
+
 def get_par_dirs(dir_path):
     has_files = set()
     for root, _, files in os.walk(dir_path, topdown=False):
@@ -88,8 +92,7 @@ def get_par_dirs(dir_path):
             dir_path = os.path.dirname(root)
             has_files.add(dir_path)
             has_files.discard(root)
-            base_name = os.path.basename(root)
-            if base_name.startswith("_") and base_name.endswith(".par"):
+            if is_par_dir(dir_path):
                 yield root
 
 
