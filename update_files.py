@@ -19,7 +19,7 @@ def backup(path):
         shutil.copy2(rel_path, backup_path)
 
 
-if __name__ == "__main__":
+def main():
 
     if os.path.exists(TEMP_DIR):
         c = input(
@@ -70,3 +70,7 @@ if __name__ == "__main__":
         shutil.rmtree(TEMP_DIR)
         prevent_sleep(False)
     print("Done!")
+
+
+if __name__ == "__main__":
+    main()

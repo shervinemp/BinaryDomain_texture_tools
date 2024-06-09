@@ -452,7 +452,7 @@ def blend(
     elif has_alpha2 and not has_alpha1:
         img1.putalpha(img2.getchannel("A"))
 
-    out_image = Image.blend(img1, img2, args.blend)
+    out_image = Image.blend(img1, img2, blend_rate)
 
     return out_image
 
@@ -507,7 +507,7 @@ def process_file(path: str, args, config: dict):
     blended.save(dest_path, optimize=False)
 
 
-if __name__ == "__main__":
+def main():
     args = parser.parse_args()
     config = {}
 
@@ -535,3 +535,7 @@ if __name__ == "__main__":
 
     fn_ = partial(process_file, args=args, config=config)
     multiproc(fn_, scan_dir(args.source_dir[0], recurse=args.recurse), args.p)
+
+
+if __name__ == "__main__":
+    main()

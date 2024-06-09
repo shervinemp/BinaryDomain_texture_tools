@@ -194,7 +194,7 @@ def compress_batch(tag_dir: str, args):
             shutil.rmtree(TEMP_DIR, ignore_errors=True)
 
 
-if __name__ == "__main__":
+def main():
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -221,3 +221,7 @@ if __name__ == "__main__":
                 compress_batch(tag_dir, args)
     finally:
         prevent_sleep(False)
+
+
+if __name__ == "__main__":
+    main()
