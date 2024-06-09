@@ -17,6 +17,8 @@ from utils import (
     unravel_dir,
 )
 
+TEMP_DIR = os.path.abspath(".tmp")
+
 
 # Define command-line arguments
 parser = argparse.ArgumentParser()
@@ -157,9 +159,8 @@ def compress_batch(tag_dir: str, args):
                 + '"{in_path}" "{out_path}"'
             )
 
-        temp_dir = ".tmp"
-        temp_indir = os.path.join(temp_dir, "_in")
-        temp_outdir = os.path.join(temp_dir, "_out")
+        temp_indir = os.path.join(TEMP_DIR, "_in")
+        temp_outdir = os.path.join(TEMP_DIR, "_out")
         hardlink_files(tag_dir, temp_indir)
 
         fn_ = partial(
@@ -189,7 +190,7 @@ def compress_batch(tag_dir: str, args):
                 silent=args.silent,
             )
         finally:
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            shutil.rmtree(TEMP_DIR, ignore_errors=True)
 
 
 if __name__ == "__main__":
