@@ -2,7 +2,7 @@ import os
 import shutil
 import subprocess
 
-from utils import get_par_dirs, hardlink_files, run_proc
+from utils import get_par_dirs, hardlink_files, prevent_sleep, run_proc
 
 PAR_TOOL = "ParTool.exe"
 PAR_TOOL_ARGS = "add -c 1"
@@ -30,37 +30,43 @@ if __name__ == "__main__":
         else:
             exit()
 
-    hardlink_files(MODIFIED_DIR, TEMP_DIR)
+    try:
+        prevent_sleep()
+        hardlink_files(MODIFIED_DIR, TEMP_DIR)
 
-    for dir_path in get_par_dirs(TEMP_DIR):
-        dir_relpath = os.path.relpath(dir_path, TEMP_DIR)
+        for dir_path in get_par_dirs(TEMP_DIR):
+            dir_relpath = os.path.relpath(dir_path, TEMP_DIR)
 
-        # remove the leading underscore of the directory name.
-        file_relpath = os.path.join((s_ := os.path.split(dir_relpath))[0], s_[1][1:])
-        if not os.path.isfile(file_relpath):
-            raise ValueError(f'No file found at "{file_relpath}"')
-
-        backup_path = os.path.join(BACKUP_DIR, file_relpath)
-        dest_path = os.path.join(TEMP_DIR, file_relpath)
-
-        print(f'Processing "{dir_relpath}"...')
-        try:
-
-            # execute the external program and capture the output
-            command_string = (
-                f'{PAR_TOOL} {PAR_TOOL_ARGS} "{backup_path}" "{dir_path}" "{dest_path}"'
+            # remove the leading underscore of the directory name.
+            file_relpath = os.path.join(
+                (s_ := os.path.split(dir_relpath))[0], s_[1][1:]
             )
+            if not os.path.isfile(file_relpath):
+                raise ValueError(f'No file found at "{file_relpath}"')
 
-            backup(file_relpath)
-            run_proc(command_string)
-        except ValueError as e:
-            print(str(e))
-        finally:
-            shutil.rmtree(dir_path)
-        print("")
+            backup_path = os.path.join(BACKUP_DIR, file_relpath)
+            dest_path = os.path.join(TEMP_DIR, file_relpath)
 
-    print("Overwriting game files...")
-    subprocess.run(
-        f'robocopy /s /move /njh /njs /ndl "{TEMP_DIR}" .', stdout=subprocess.DEVNULL
-    )
+            print(f'Processing "{dir_relpath}"...')
+            try:
+
+                # execute the external program and capture the output
+                command_string = f'{PAR_TOOL} {PAR_TOOL_ARGS} "{backup_path}" "{dir_path}" "{dest_path}"'
+
+                backup(file_relpath)
+                run_proc(command_string)
+            except ValueError as e:
+                print(str(e))
+            finally:
+                shutil.rmtree(dir_path)
+            print("")
+
+        print("Overwriting game files...")
+        subprocess.run(
+            f'robocopy /s /move /njh /njs /ndl "{TEMP_DIR}" .',
+            stdout=subprocess.DEVNULL,
+        )
+    finally:
+        shutil.rmtree(TEMP_DIR)
+        prevent_sleep(False)
     print("Done!")
