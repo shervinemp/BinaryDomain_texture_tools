@@ -2,7 +2,7 @@ import os
 import shutil
 import subprocess
 
-from utils import get_par_dirs, run_proc
+from utils import get_par_dirs, hardlink_files, run_proc
 
 PAR_TOOL = "ParTool.exe"
 PAR_TOOL_ARGS = "add -c 1"
@@ -30,8 +30,7 @@ if __name__ == "__main__":
         else:
             exit()
 
-    print(f'Copying files to "{TEMP_DIR}" for processing...')
-    shutil.copytree(MODIFIED_DIR, TEMP_DIR)
+    hardlink_files(MODIFIED_DIR, TEMP_DIR)
 
     for dir_path in get_par_dirs(TEMP_DIR):
         dir_relpath = os.path.relpath(dir_path, TEMP_DIR)
