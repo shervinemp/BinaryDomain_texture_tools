@@ -75,9 +75,12 @@ def scan_dir(path: str, recurse: bool = False, return_dirs: bool = False):
             if not return_dirs:
                 yield entry.path
         else:
-            if return_dirs and len(next(os.walk(entry))[2]):
+            if return_dirs:
                 yield entry.path
-            yield from scan_dir(entry.path, recurse=recurse, return_dirs=return_dirs)
+            if recurse:
+                yield from scan_dir(
+                    entry.path, recurse=recurse, return_dirs=return_dirs
+                )
 
 
 def is_par_dir(path):
@@ -108,6 +111,15 @@ def get_path_w_ext(base_path, extensions):
     )
 
 
+def hardlink_files(src_dir, dest_dir):
+    for root, _, files in os.walk(src_dir):
+        for file in files:
+            src_path = os.path.join(root, file)
+            dest_path = os.path.join(dest_dir, os.path.relpath(src_path, src_dir))
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+            os.link(src_path, dest_path)
+
+
 def flatten_dir(directory):
     # move all files in subdirectories to the root directory
     index = 0
@@ -121,8 +133,8 @@ def flatten_dir(directory):
             dest_path = os.path.join(directory, new_filename)
             os.rename(src_path, dest_path)
     for root, dirs, _ in os.walk(directory, topdown=False):
-        for dir in dirs:
-            dir_path = os.path.join(root, dir)
+        for d in dirs:
+            dir_path = os.path.join(root, d)
             try:
                 os.rmdir(dir_path)
             except OSError:

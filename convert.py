@@ -8,6 +8,7 @@ from utils import (
     flatten_dir,
     get_ddsinfo,
     get_format_tag,
+    hardlink_files,
     is_path_var,
     multiproc,
     run_proc,
@@ -95,8 +96,6 @@ def decompress(path: str, args):
 
 def compress_batch(tag_dir: str, args):
     tag = os.path.basename(tag_dir)
-    dest_subdir = os.path.join(args.output_dir, tag)
-    os.makedirs(dest_subdir, exist_ok=True)
 
     is_cubemap = tag.endswith("_CUBEMAP")
     if is_cubemap:
@@ -151,38 +150,46 @@ def compress_batch(tag_dir: str, args):
             else:
                 if not args.silent:
                     print(f'Input texture format "{tag}" not supported yet!')
+                    return
 
             compress_str = (
                 f"nvcompress -silent -{format} -mipfilter kaiser -production "
                 + '"{in_path}" "{out_path}"'
             )
+
+        temp_dir = ".tmp"
+        temp_indir = os.path.join(temp_dir, "_in")
+        temp_outdir = os.path.join(temp_dir, "_out")
+        hardlink_files(tag_dir, temp_indir)
+
         fn_ = partial(
             transform_op,
-            file_addr=tag_dir,
+            file_addr=temp_indir,
             command=compress_str,
-            source_dir=tag_dir,
+            source_dir=temp_indir,
         )
 
-        temp_outdir = os.path.join(dest_subdir, "__tmp__")
-        os.makedirs(temp_outdir, exist_ok=True)
-        if args.recurse:
-            file_paths = flatten_dir(temp_outdir)
-        fn_(target_dir=temp_outdir)
-        if args.recurse:
-            file_paths_dds = dict(
-                zip(
-                    map(lambda x: os.path.splitext(x)[0] + ".dds", file_paths.keys()),
-                    file_paths.values(),
+        try:
+            if args.recurse:
+                file_paths = flatten_dir(temp_indir)
+            fn_(target_dir=temp_outdir)
+            if args.recurse:
+                file_paths_dds = dict(
+                    zip(
+                        map(
+                            lambda x: os.path.splitext(x)[0] + ".dds", file_paths.keys()
+                        ),
+                        file_paths.values(),
+                    )
                 )
+                unravel_dir(temp_outdir, file_paths_dds)
+
+            run_proc(
+                f'robocopy /s /move /njh /njs /ndl "{temp_outdir}" "{args.output_dir}"',
+                silent=args.silent,
             )
-            unravel_dir(temp_outdir, file_paths_dds)
-
-        run_proc(
-            f'robocopy /s /move /njh /njs /ndl "{temp_outdir}" "{args.output_dir}"',
-            silent=args.silent,
-        )
-
-        shutil.rmtree(temp_outdir, ignore_errors=True)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":
@@ -202,4 +209,5 @@ if __name__ == "__main__":
             print("Make sure you have NVIDIA Texture Tools installed and in your PATH.")
             exit()
         for tag_dir in scan_dir(args.source_dir, recurse=False, return_dirs=True):
+            print(f"Processing {tag_dir}...")
             compress_batch(tag_dir, args)
