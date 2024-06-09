@@ -232,3 +232,18 @@ def dict_get(d: dict, path: str):
             if i + 1 != len(path):
                 d = d[1]
     return d
+
+
+def prevent_sleep(reset=False):
+    import ctypes
+
+    # Constants for the Windows API
+    ES_CONTINUOUS = 0x80000000
+    ES_SYSTEM_REQUIRED = 0x00000001
+
+    if reset:
+        ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)
+    else:
+        ctypes.windll.kernel32.SetThreadExecutionState(
+            ES_CONTINUOUS | ES_SYSTEM_REQUIRED
+        )

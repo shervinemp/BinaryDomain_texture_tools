@@ -11,6 +11,7 @@ from utils import (
     hardlink_files,
     is_path_var,
     multiproc,
+    prevent_sleep,
     run_proc,
     scan_dir,
     transform_op,
@@ -199,16 +200,24 @@ if __name__ == "__main__":
     os.makedirs(args.output_dir, exist_ok=True)
     is_decompress = args.operation == "decompress"
 
-    if is_decompress:
-        if not (is_path_var("nvddsinfo") and is_path_var("nvdecompress")):
-            print("Make sure you have NVIDIA Texture Tools installed and in your PATH.")
-            exit()
-        fn_ = partial(decompress, args=args)
-        multiproc(fn_, scan_dir(args.source_dir, recurse=args.recurse), args.p)
-    else:
-        if not is_path_var("nvcompress"):
-            print("Make sure you have NVIDIA Texture Tools installed and in your PATH.")
-            exit()
-        for tag_dir in scan_dir(args.source_dir, recurse=False, return_dirs=True):
-            print(f"Processing {tag_dir}...")
-            compress_batch(tag_dir, args)
+    try:
+        prevent_sleep()
+        if is_decompress:
+            if not (is_path_var("nvddsinfo") and is_path_var("nvdecompress")):
+                print(
+                    "Make sure you have NVIDIA Texture Tools installed and in your PATH."
+                )
+                exit()
+            fn_ = partial(decompress, args=args)
+            multiproc(fn_, scan_dir(args.source_dir, recurse=args.recurse), args.p)
+        else:
+            if not is_path_var("nvcompress"):
+                print(
+                    "Make sure you have NVIDIA Texture Tools installed and in your PATH."
+                )
+                exit()
+            for tag_dir in scan_dir(args.source_dir, recurse=False, return_dirs=True):
+                print(f"Processing {tag_dir}...")
+                compress_batch(tag_dir, args)
+    finally:
+        prevent_sleep(False)
