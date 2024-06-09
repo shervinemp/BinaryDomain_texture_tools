@@ -33,7 +33,7 @@ Use the `extract.bat` script to extract texture files from the game's PAR archiv
 
 3. **Confirm Directory Structure**: When prompted, choose whether to create a corresponding directory structure under the modified directory.
 
-This script processes `.par` files and extracts their contents into their respective subdirectories under the modified directory (`__modified`).
+This script processes `.par` files and extracts their contents into their respective subdirectories
 
 ## Converting Textures
 
@@ -50,7 +50,7 @@ Use `python convert.py compress` to compress the PNG files into DDS.
 
 ## Repacking Textures
 
-After editing, repack the textures into the game's PAR archives using the `update_files.py` script.
+After editing, repack the textures into the game's PAR archives using `python update_files.py`.
 
 ### Usage
 
@@ -61,7 +61,7 @@ After editing, repack the textures into the game's PAR archives using the `updat
     python update_files.py
     ```
 
-This script pushes the modified files (under `__modified`) into the `.par` files. This operation requires the nested `.par` files created during extraction and overwrites them.
+This script pushes the modified files (under `__modified`) into the `.par` files. This operation requires the nested `.par` files created during extraction.
 
 ## Restoring Backups
 
