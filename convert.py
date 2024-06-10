@@ -187,7 +187,7 @@ def compress_batch(tag_dir: str, args):
                 unravel_dir(temp_outdir, file_paths_dds)
 
             run_proc(
-                f'robocopy /s /move /njh /njs /ndl "{temp_outdir}" "{args.output_dir}"',
+                f'robocopy /s /move /njh /njs /ndl "{temp_outdir.rstrip('\\')}" "{args.output_dir.rstrip('\\')}"',
                 silent=args.silent,
             )
         finally:
