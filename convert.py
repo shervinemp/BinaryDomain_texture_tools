@@ -100,8 +100,7 @@ def decompress(path: str, args):
 def compress_batch(tag_dir: str, args): # TODO: fix skip as currently it is checked after the operation is done
     tag = os.path.basename(tag_dir)
     
-    def check_dds_exist(file_path):
-        relpath = os.path.relpath(file_path, tag_dir)
+    def check_dds_exist(relpath):
         dest_path = os.path.join(args.output_dir, os.path.splitext(relpath)[0] + ".dds")
         if args.skip and os.path.exists(dest_path):
             print(f'"{os.path.splitext(relpath)[0]}" already exists. Skipping...')
@@ -135,7 +134,7 @@ def compress_batch(tag_dir: str, args): # TODO: fix skip as currently it is chec
             for p in scan_dir(tag_dir, recurse=args.recurse)
             if os.path.splitext(p)[0].endswith("_face0")
         )
-        files = filter(lambda x: not check_dds_exist(x), files)
+        files = filter(lambda x: not check_dds_exist(os.path.relpath(x, tag_dir)), files)
         
         multiproc(fn_, files, args.p, chunksize=3)
 
@@ -175,7 +174,7 @@ def compress_batch(tag_dir: str, args): # TODO: fix skip as currently it is chec
         hardlink_files(tag_dir, temp_indir)
         
         for file_path in scan_dir(temp_indir, recurse=args.recurse):
-            if check_dds_exist(file_path):
+            if check_dds_exist(os.path.relpath(file_path, temp_indir)):
                 os.remove(file_path)
 
         fn_ = partial(
@@ -211,6 +210,7 @@ def compress_batch(tag_dir: str, args): # TODO: fix skip as currently it is chec
 def main():
     args = parser.parse_args()
 
+    shutil.rmtree(TEMP_DIR, ignore_errors=True)
     os.makedirs(args.output_dir, exist_ok=True)
     is_decompress = args.operation == "decompress"
 
