@@ -6,7 +6,7 @@ from utils import get_par_dirs, hardlink_files, prevent_sleep, run_proc
 
 PAR_TOOL = "ParTool.exe"
 PAR_TOOL_ARGS = "add -c 1"
-MODIFIED_DIR = os.path.abspath("__modified")
+STAGED_DIR = os.path.abspath("__staged")
 TEMP_DIR = os.path.abspath(".tmp")
 BACKUP_DIR = os.path.abspath("__backup")
 
@@ -32,7 +32,7 @@ def main():
 
     try:
         prevent_sleep()
-        hardlink_files(MODIFIED_DIR, TEMP_DIR)
+        hardlink_files(STAGED_DIR, TEMP_DIR)
 
         for dir_path in get_par_dirs(TEMP_DIR):
             dir_relpath = os.path.relpath(dir_path, TEMP_DIR)
