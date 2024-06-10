@@ -97,7 +97,7 @@ def decompress(path: str, args):
     decompress_op(path, dest_path, tag, silent=args.silent)
 
 
-def compress_batch(tag_dir: str, args): # TODO: fix skip as currently it is checked after the operation is done
+def compress_batch(tag_dir: str, args):
     tag = os.path.basename(tag_dir)
     
     def check_dds_exist(relpath):
