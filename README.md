@@ -110,4 +110,5 @@ Upscaling some textures, especially those related to the main menu, may cause th
 
 1. See if [**dx-disassembler**](https://github.com/theturboturnip/dx-disassembler/) works with Binary Domain shader files.
 
-2. See if [**SonicAudioTools**](https://github.com/blueskythlikesclouds/SonicAudioTools/) works with Binary Domain csb files.
+2. See if [**~~SonicAudioTools~~**](https://github.com/blueskythlikesclouds/SonicAudioTools/) works with Binary Domain csb files.
+    At first glance, does not seem to work. [This](https://pchelpforum.net/t/some-help-with-adx-aax-csb-game-sound-files.44367/) be interesting though.
