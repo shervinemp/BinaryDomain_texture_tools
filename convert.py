@@ -97,8 +97,16 @@ def decompress(path: str, args):
     decompress_op(path, dest_path, tag, silent=args.silent)
 
 
-def compress_batch(tag_dir: str, args):
+def compress_batch(tag_dir: str, args): # TODO: fix skip as currently it is checked after the operation is done
     tag = os.path.basename(tag_dir)
+    
+    def check_dds_exist(file_path):
+        relpath = os.path.relpath(file_path, tag_dir)
+        dest_path = os.path.join(args.output_dir, os.path.splitext(relpath)[0] + ".dds")
+        if args.skip and os.path.exists(dest_path):
+            print(f'"{os.path.splitext(relpath)[0]}" already exists. Skipping...')
+            return True
+        return False
 
     is_cubemap = tag.endswith("_CUBEMAP")
     if is_cubemap:
@@ -127,6 +135,8 @@ def compress_batch(tag_dir: str, args):
             for p in scan_dir(tag_dir, recurse=args.recurse)
             if os.path.splitext(p)[0].endswith("_face0")
         )
+        files = filter(lambda x: not check_dds_exist(x), files)
+        
         multiproc(fn_, files, args.p, chunksize=3)
 
     else:
@@ -163,6 +173,10 @@ def compress_batch(tag_dir: str, args):
         temp_indir = os.path.join(TEMP_DIR, "_in")
         temp_outdir = os.path.join(TEMP_DIR, "_out")
         hardlink_files(tag_dir, temp_indir)
+        
+        for file_path in scan_dir(temp_indir, recurse=args.recurse):
+            if check_dds_exist(file_path):
+                os.remove(file_path)
 
         fn_ = partial(
             transform_op,
