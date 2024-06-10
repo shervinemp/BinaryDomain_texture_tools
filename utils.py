@@ -20,11 +20,16 @@ def run_proc(command_string, silent=False):
         stderr=subprocess.PIPE,
         shell=True,
     ) as prc:
-        while prc.poll() is None:
-            out = prc.stdout.readline()
-            echo(out.decode())
-        err = prc.stderr.read()
-        echo(err.decode())
+        try:
+            while prc.poll() is None:
+                out = prc.stdout.readline()
+                echo(out.decode())
+            err = prc.stderr.read()
+            echo(err.decode())
+        except KeyboardInterrupt as e:
+            if not silent:
+                print(f"Incomplete: {command_string}")
+            raise e
 
 
 def multiproc(fn_: Callable, iter_: Iterable, p: int, chunksize: int = 8) -> Set:
