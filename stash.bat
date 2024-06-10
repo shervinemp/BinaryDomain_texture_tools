@@ -15,22 +15,22 @@
 @echo off
 setlocal enabledelayedexpansion enableextensions
 
-set "modified=__modified\"
+set "staged=__staged\"
 set "unstaged=__unstaged\"
 
 for %%i in (%*) do (
     set "file=%%~fi"
     if "!file:~-1!"=="\" set "file=!file:~0,-1!"
 
-    set "wo_mod=!file:%modified%=!"
+    set "wo_mod=!file:%staged%=!"
     set "wo_usg=!file:%unstaged%=!"
 
     if not "!wo_mod!"=="!%file!" (
-        set "file_dest=!file:%modified%=%unstaged%!"
+        set "file_dest=!file:%staged%=%unstaged%!"
     ) else if not "!wo_usg!"=="!file!" (
-        set "file_dest=!file:%unstaged%=%modified%!"
+        set "file_dest=!file:%unstaged%=%staged%!"
     ) else (
-        echo "!file! is not under '__modified' or '__unstaged'."
+        echo "!file! is not under '__staged' or '__unstaged'."
         exit /b
     )
 

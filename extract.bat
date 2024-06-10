@@ -4,9 +4,9 @@ setlocal enabledelayedexpansion enableextensions
 set "par_tool=ParTool.exe"
 set "par_tool_args=extract"
 
-call :full_path modified_dir "__modified"
+call :full_path staged_dir "__staged"
 
-set /p "confirm=Do you want to make a mirror structure under the modified directory? (Y/N) "
+set /p "confirm=Do you want to make a mirrored directory hierarchy under __staged for staged changes? (Y/N) "
 
 call :process_dir "%cd%"
 goto :eof
@@ -32,7 +32,7 @@ goto :eof
         rmdir /s /q "!output_dir!"
     )
 
-    set "outputm_dir=!output_dir:%cd%=%modified_dir%!"
+    set "outputm_dir=!output_dir:%cd%=%staged_dir%!"
     if /i "%confirm%"=="y" (
         mkdir "!outputm_dir!" 2>nul
     )
