@@ -100,7 +100,7 @@ def get_par_dirs(dir_path):
             dir_path = os.path.dirname(root)
             has_files.add(dir_path)
             has_files.discard(root)
-            if is_par_dir(dir_path):
+            if is_par_dir(root):
                 yield root
 
 
