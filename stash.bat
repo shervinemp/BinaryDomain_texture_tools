@@ -1,4 +1,4 @@
-@REM Move files/dirs passed as input between '__modified' and '__unstaged'.
+@REM Move files/dirs passed as input between '__staged' and '__unstaged'.
 @REM
 @REM Usage:
 @REM stash.bat <file/dir> [<file/dir> ...]
@@ -6,10 +6,10 @@
 @REM Example:
 @REM stash.bat file1 file2 dir1
 @REM
-@REM This will move file1, file2, and dir1 from '__modified' to '__unstaged', or vice versa.
+@REM This will move file1, file2, and dir1 from '__staged' to '__unstaged', or vice versa.
 @REM
 @REM Note:
-@REM If the file/dir is not under '__modified' or '__unstaged', it will be ignored.
+@REM If the file/dir is not under '__staged' or '__unstaged', it will be ignored.
 @REM
 
 @echo off
