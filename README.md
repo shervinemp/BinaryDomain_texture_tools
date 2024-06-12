@@ -18,54 +18,54 @@ Make sure Python (>= 3.9) and the following tools are installed and added to you
 4. [**ParManager**](https://github.com/Kaplas80/ParManager/releases)  
    ParManager is a utility for managing PAR archives used in SEGA-developed games like the Yakuza series and Binary Domain. It supports listing, extracting, creating, deleting, and adding files to these archives. Add the directory of the main executable to your `PATH`.
 
-## Extracting Textures
+## Scripts
+
+### Extracting Textures
 
 Use the `extract.bat` script to extract texture files from the game's PAR archives.
 
-### Usage
-
-1. **Navigate to the Game Directory**: Open a command prompt and navigate to the directory containing your game files. (as with all the other scripts)
-2. **Run the Script**: Execute `extract.bat`:
+**Navigate to the Game Directory**: Open a command prompt and navigate to the directory containing your game files. (as with all the other scripts)
+**Run the Script**: Execute `extract.bat`:
 
     ```sh
     extract.bat
     ```
 
-3. **Confirm Directory Structure**: When prompted, choose whether to create a corresponding directory structure under the staged directory.
+**Confirm Directory Structure**: When prompted, choose whether to create a corresponding directory structure under the staged directory.
 
 This script processes `.par` files and extracts their contents into their respective subdirectories.
 
-## Converting Textures
+### Converting Textures
 
 Use `python convert.py decompress "my_dds_directory"` to decompress the DDS textures into PNG.
 
-## Editing Textures & Upscaling
+### Editing Textures & Upscaling
 
 Edit the extracted textures using your preferred image editing software.
 Optionally, use the `python scale.py` script to upscale, sharpen and blend images together.
 
-## Compressing Textures
+### Compressing Textures
 
 Use `python convert.py compress "my_png_directory"` to compress the PNG textures into DDS.
 
-## Repacking Textures
+### Repacking Textures
 
 After editing, repack the textures into the game's PAR archives using `python update_files.py`. (use with `--fresh` to use backup files as base)
 This script pushes the staged files (under `__staged`) into the `.par` files. This operation requires the nested `.par` files created during extraction.
 
-## Stashing changes
+### Stashing changes
 
 Use the `stash.bat` with the address of a file/directory under the staging directory, to move the contents into its equivalent subdirectory under `__unstaged`, and vice versa.
 
-## Restoring Backups
+### Restoring Backups
 
 This script restores the `.par` files (under `__backup`) to their original locations.
 
-## Cleaning Up
+### Cleaning Up
 
 Use `clean.bat` to clean up the extracted directories. First, read what the code does before actually using it. (might delete unintended directories)
 
-## Testing Your Mod
+### Testing Your Mod
 
 Launch the game to test your newly modded textures. Ensure everything appears as expected and make any necessary adjustments.
 
