@@ -123,6 +123,7 @@ def main():
             diff = ledger.diff(dir_path)
             if len(diff) == 0:
                 print("No changes detected. Skipping update...")
+                shutil.rmtree(dir_path)
                 continue
 
             run_proc(command_string)
