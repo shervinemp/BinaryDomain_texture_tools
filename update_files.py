@@ -122,7 +122,7 @@ def main():
 
             diff = ledger.diff(dir_path)
             if len(diff) == 0:
-                print(f"No changes detected. Skipping update for {dir_relpath}.")
+                print("No changes detected. Skipping update...")
                 continue
 
             run_proc(command_string)
