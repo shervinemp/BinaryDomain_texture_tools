@@ -6,7 +6,14 @@ import hashlib
 import json
 import gzip
 
-from utils import get_par_dirs, hardlink_files, prevent_sleep, run_proc, scan_dir
+from utils import (
+    get_par_dirs,
+    hardlink_files,
+    link_compat,
+    prevent_sleep,
+    run_proc,
+    scan_dir,
+)
 
 PAR_TOOL = "ParTool.exe"
 PAR_TOOL_ARGS = "add -c 1"
@@ -124,7 +131,7 @@ def main():
             shutil.rmtree(dir_path)
 
             os.remove(file_relpath)
-            os.link(dest_path, file_relpath)
+            link_compat(dest_path, file_relpath)
             print("")
 
     finally:

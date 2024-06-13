@@ -122,7 +122,16 @@ def hardlink_files(src_dir, dest_dir):
             src_path = os.path.join(root, file)
             dest_path = os.path.join(dest_dir, os.path.relpath(src_path, src_dir))
             os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-            os.link(src_path, dest_path)
+            link_compat(src_path, dest_path)
+
+
+def link_compat(src, dest):
+    try:
+        # try hardlinking first
+        os.link(src, dest)
+    except OSError:
+        # if that fails, copy the file
+        shutil.copy2(src, dest)
 
 
 def flatten_dir(directory):
