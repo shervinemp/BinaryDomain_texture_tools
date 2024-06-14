@@ -1,7 +1,6 @@
 import argparse
 import os
 import shutil
-import subprocess
 import hashlib
 import json
 import gzip
@@ -45,7 +44,7 @@ class UpdateLedger:
         with gzip.open(self._path, "wt", encoding="utf-8") as f:
             json.dump(self.ledger, f)
 
-    def _generate_hash(self, file_path: str) -> str:
+    def _gen_hash(self, file_path: str) -> str:
         hash_func = hashlib.md5()
         with open(file_path, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
@@ -53,20 +52,20 @@ class UpdateLedger:
 
         return hash_func.hexdigest()
 
-    def diff(self, directory: str) -> dict:
-        # Don't allow the user to update files from outside the staged directory.
+    def get_diff(self, directory: str) -> dict:
+        # "directory" should strictly be under the temp directory.
         assert not os.path.relpath(directory, TEMP_DIR).startswith("..")
 
-        # Removed files are not considered to allow clean up of the staged directory.
+        # Don't consider removed files as changed files, to allow for easier clean up of the staged directory.
         diff = {
             k: v
             for file in scan_dir(directory, recurse=True)
             if self.ledger.get(k := os.path.relpath(file, TEMP_DIR), None)
-            != (v := self._generate_hash(file))
+            != (v := self._gen_hash(file))
         }
         return diff
 
-    def push_diff(self, diff: dict) -> None:
+    def push(self, diff: dict) -> None:
         self.ledger.update(diff)
         self._save()
 
@@ -120,7 +119,7 @@ def main():
                 os.makedirs(os.path.dirname(backup_path), exist_ok=True)
                 shutil.copy2(file_relpath, backup_path)
 
-            diff = ledger.diff(dir_path)
+            diff = ledger.get_diff(dir_path)
             if len(diff) == 0:
                 print("No changes detected. Skipping update...")
                 shutil.rmtree(dir_path)
@@ -128,7 +127,7 @@ def main():
 
             run_proc(command_string)
 
-            ledger.push_diff(diff)
+            ledger.push(diff)
             shutil.rmtree(dir_path)
 
             os.remove(file_relpath)
@@ -144,7 +143,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# Incomplete: ParTool.exe add -c 1 "C:\Program Files (x86)\Steam\steamapps\common\Binary Domain\__backup\p_auth\s0830_0000a_01.par" "C:\Program Files (x86)\Steam\steamapps\common\Binary Domain\.tmp\p_auth\_s0830_0000a_01.par" "C:\Program Files (x86)\Steam\steamapps\common\Binary Domain\.tmp\p_auth\s0830_0000a_01.par"
-# Changed files: {'..\\.tmp\\p_auth\\_s0830_0000a_01.par\\TiEventAuth_Archive\\dummy_ref.dds': '10432276dfb9de9c5b043004d4bcb393', '..\\.tmp\\p_auth\\_s0830_0000a_01.par\\TiEventAuth_Archive\\o_a_kas_caine_wire_rope_d.dds': 'c331feb6c3c0ea6bea3860a51ed5abc3', '..\\.tmp\\p_auth\\_s0830_0000a_01.par\\TiEventAuth_Archive\\o_a_kas_caine_wire_rope_n.dds': '335ef07a7305e7fbd36cc7afadc3c020', '..\\.tmp\\p_auth\\_s0830_0000a_01.par\\TiEventAuth_Archive\\o_a_kas_caine_wire_rope_u.dds': 'c7b831b7ae6166ff728ec59ffdb9bd76'}
