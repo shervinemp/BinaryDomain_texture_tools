@@ -126,12 +126,12 @@ def main():
                 continue
 
             run_proc(command_string)
-
-            ledger.push(diff)
             shutil.rmtree(dir_path)
 
             os.remove(file_relpath)
             link_compat(dest_path, file_relpath)
+
+            ledger.push(diff)
             print("")
 
     finally:
