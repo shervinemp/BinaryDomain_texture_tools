@@ -1,6 +1,7 @@
 from functools import partial
 import shutil
 import subprocess
+import time
 from typing import Callable, Iterable, Set
 from PIL import Image
 import os
@@ -24,6 +25,7 @@ def run_proc(command_string, silent=False):
             while prc.poll() is None:
                 out = prc.stdout.readline()
                 echo(out.decode())
+                time.sleep(0.05)
             err = prc.stderr.read()
             echo(err.decode())
         except KeyboardInterrupt as e:
@@ -90,6 +92,10 @@ def scan_dir(path: str, recurse: bool = False, return_dirs: bool = False):
 
 def is_par_dir(path):
     return (s_ := os.path.basename(path)).startswith("_") and s_.endswith(".par")
+
+
+def is_descendant_of(path, root):
+    return not os.path.relpath(path, root).startswith("..")
 
 
 def get_par_dirs(dir_path):
