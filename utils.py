@@ -90,6 +90,23 @@ def scan_dir(path: str, recurse: bool = False, return_dirs: bool = False):
                 )
 
 
+def get_dir_size(path: str):
+    return sum(
+        [
+            os.path.getsize(os.path.join(root, file))
+            for root, _, files in os.walk(path)
+            for file in files
+        ]
+    )
+
+
+def is_empty_dir(path: str):
+    for _, _, files in os.walk(path):
+        if files:
+            return False
+    return True
+
+
 def is_par_dir(path):
     return (s_ := os.path.basename(path)).startswith("_") and s_.endswith(".par")
 

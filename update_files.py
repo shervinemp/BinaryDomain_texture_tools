@@ -7,6 +7,7 @@ import gzip
 from typing import Optional
 
 from utils import (
+    get_dir_size,
     get_par_dirs,
     hardlink_files,
     is_descendant_of,
@@ -93,17 +94,53 @@ def update_par(
         os.makedirs(os.path.dirname(backup_path), exist_ok=True)
         shutil.copy2(file_relpath, backup_path)
 
-    source_path = backup_path if backup_as_source else file_relpath
-    if not os.path.exists(file_relpath):
-        print(f'File "{file_relpath}" could not be found. Using backup as source.')
+    if backup_as_source:
         source_path = backup_path
-        ledger.clear(source_dir)
+    else:
+        source_path = file_relpath
+        if not os.path.exists(source_path):  # Fallback to backup if source is missing.
+            print(f'File "{source_path}" could not be found. Using backup as source.')
+            link_compat(backup_path, source_path)
+            ledger.clear(source_dir)
 
     diff = ledger.get_diff(source_dir)
     if len(diff) == 0:
+        print("No changes detected. Skipping update...")
         link_compat(source_path, dest_path)
         shutil.rmtree(source_dir)
-        print("No changes detected. Skipping update...")
+        return
+
+    limit_size = 2 * 1024 * 1024 * 1024  # 2GB
+    if get_dir_size(source_dir) > limit_size:
+        print("Update exceeds 2GB. Splitting into parts...")
+        partitions = [set()]
+        last_partition_size = 0
+        parts_dir = os.path.join(source_dir, ".parts")
+        for dirpath, _, filenames in os.walk(source_dir):
+            for filename in filenames:
+                file_path = os.path.join(dirpath, filename)
+                file_size = os.path.getsize(file_path)
+                if last_partition_size + file_size > limit_size:
+                    partitions.append(set())
+                    last_partition_size = 0
+                partitions[-1].add(file_path)
+                last_partition_size += file_size
+                new_path = os.path.join(
+                    parts_dir,
+                    f"{len(partitions) - 1}",
+                    os.path.relpath(file_path, source_dir),
+                )
+                os.makedirs(os.path.dirname(new_path), exist_ok=True)
+                os.rename(file_path, new_path)
+
+        for sub_dir in os.listdir(parts_dir):
+            update_par(
+                source_dir=os.path.join(parts_dir, sub_dir),
+                target_path=target_path,
+                ledger=ledger,
+                backup_as_source=backup_as_source,
+            )
+            backup_as_source = False
         return
 
     command_string = (
