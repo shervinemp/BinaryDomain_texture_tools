@@ -100,8 +100,8 @@ def update_par(
         source_path = file_relpath
         if not os.path.exists(source_path):  # Fallback to backup if source is missing.
             print(f'File "{source_path}" could not be found. Using backup as source.')
-            link_compat(backup_path, source_path)
             ledger.clear(source_dir)
+            link_compat(backup_path, source_path)
 
     diff = ledger.get_diff(source_dir)
     if len(diff) == 0:
