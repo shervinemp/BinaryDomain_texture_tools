@@ -113,21 +113,21 @@ def update_par(
     limit_size = 2 * 1024 * 1024 * 1024  # 2GB
     if get_dir_size(source_dir) > limit_size:
         print("Update exceeds 2GB. Splitting into parts...")
-        partitions = [set()]
-        last_partition_size = 0
+        parts = [set()]
+        last_part_size = 0
         parts_dir = os.path.join(source_dir, ".parts")
         for dirpath, _, filenames in os.walk(source_dir):
             for filename in filenames:
                 file_path = os.path.join(dirpath, filename)
                 file_size = os.path.getsize(file_path)
-                if last_partition_size + file_size > limit_size:
-                    partitions.append(set())
-                    last_partition_size = 0
-                partitions[-1].add(file_path)
-                last_partition_size += file_size
+                if last_part_size + file_size > limit_size:
+                    parts.append(set())
+                    last_part_size = 0
+                parts[-1].add(file_path)
+                last_part_size += file_size
                 new_path = os.path.join(
                     parts_dir,
-                    f"{len(partitions) - 1}",
+                    f"{len(parts) - 1}",
                     os.path.relpath(file_path, source_dir),
                 )
                 os.makedirs(os.path.dirname(new_path), exist_ok=True)
