@@ -1,4 +1,5 @@
 from functools import partial
+import hashlib
 import shutil
 import subprocess
 import time
@@ -74,6 +75,15 @@ def load_image(path: str):
         alpha = Image.open(p[0] + "_alpha." + p[1]).convert("L")
         im.putalpha(alpha)
     return im
+
+
+def md5(path: str):
+    hash_func = hashlib.md5()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_func.update(chunk)
+
+    return hash_func.hexdigest()
 
 
 def scan_dir(path: str, recurse: bool = False, return_dirs: bool = False):
@@ -234,8 +244,8 @@ def parse_ddsinfo(lines, *, return_count=False):
                     else:
                         break
                 indent = ws * w
-                for l in lines[1:]:
-                    if l.startswith(indent):
+                for ln in lines[1:]:
+                    if ln.startswith(indent):
                         h += 1
                     else:
                         break
