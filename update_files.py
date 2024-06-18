@@ -61,16 +61,18 @@ class Ledger(dict):
     def __getitem__(self, key: str) -> Ledger.HashSnapshot:
         assert is_descendant_of(key, os.getcwd())
         if key not in self:
-            self[key] = Ledger.HashSnapshot()
+            self[key] = (md5(key), Ledger.HashSnapshot())
         return super().__getitem__(key)
 
     def load(self) -> dict:
         with gzip.open(self._path, "rt", encoding="utf-8") as f:
-            self.update({k: Ledger.HashSnapshot(v) for k, v in json.load(f).items()})
+            self.update(
+                {k: (v[0], Ledger.HashSnapshot(v[1])) for k, v in json.load(f).items()}
+            )
 
     def save(self) -> None:
         with gzip.open(self._path, "wt", encoding="utf-8") as f:
-            json.dump({k: dict(v) for k, v in self.items()}, f)
+            json.dump({k: (v[0], dict(v[1])) for k, v in self.items()}, f)
 
 
 def update_par(
@@ -95,9 +97,11 @@ def update_par(
             print(f'File "{target_par}" could not be found. Using backup as source.')
             del ledger[target_par]
             link_compat(backup_par, target_par)
+        elif md5(target_par) != ledger[target_par][0]:
+            del ledger[target_par]
         source_par = target_par
 
-    diff = ledger[target_par].changed(content_dir)
+    diff = ledger[target_par][1].changed(content_dir)
     if len(diff) == 0:
         print("No changes detected. Skipping update...")
         temp_par = os.path.join(TEMP_DIR, os.path.relpath(target_par, os.getcwd()))
@@ -128,15 +132,15 @@ def update_par(
 
     if parts is None:
         _op(content_dir)
-        ledger[target_par].update(diff)
+        ledger[target_par][1].update(diff)
         ledger.save()
     else:
         for part in os.listdir(parts_dir):
             print(f"Processing part {part}...")
             part_dir = os.path.join(parts_dir, part)
-            diff = ledger[target_par].changed(part_dir)
+            diff = ledger[target_par][1].changed(part_dir)
             _op(part_dir)
-            ledger[target_par].update(diff)
+            ledger[target_par][1].update(diff)
             ledger.save()
             source_par = target_par
 
