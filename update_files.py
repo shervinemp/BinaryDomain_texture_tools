@@ -112,8 +112,10 @@ def update_par(
 
     max_size = 2**31  # 2GB
     parts = None
-    if get_dir_size(content_dir) > max_size:
-        print(f"Update exceeds {max_size/2**30}GB. Splitting into parts...")
+    if (dir_size := get_dir_size(content_dir)) > max_size:
+        print(
+            f"Update ({dir_size / 2**30 : 0.2f}GB) exceeds {max_size / 2**30 : 0.2f}GB. Splitting into parts..."
+        )
         parts_dir, parts = partition(content_dir, max_size)
 
     temp_par = os.path.join(TEMP_DIR, os.path.relpath(target_par, os.getcwd()))
@@ -129,7 +131,9 @@ def update_par(
         ledger[target_par].update(diff)
         ledger.save()
     else:
-        for part_dir in os.listdir(parts_dir):
+        for part in os.listdir(parts_dir):
+            print(f"Processing part {part}...")
+            part_dir = os.path.join(parts_dir, part)
             diff = ledger[target_par].changed(part_dir)
             _op(part_dir)
             ledger[target_par].update(diff)
