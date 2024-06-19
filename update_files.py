@@ -130,8 +130,6 @@ def update_par(
         )
         parts_dir, parts = partition(content_dir, max_size)
 
-    temp_par = os.path.join(TEMP_DIR, os.path.relpath(target_par, os.getcwd()))
-
     def pack_save(content_dir: str):
         par_add(source_par, temp_par, content_dir)
         shutil.rmtree(content_dir)
@@ -141,6 +139,7 @@ def update_par(
         ledger[target_par] = (md5_hash(target_par), {**prev_snapshot, **diff})
         ledger.save()
 
+    temp_par = os.path.join(TEMP_DIR, os.path.relpath(target_par, os.getcwd()))
     prev_snapshot = ledger[target_par][1]
     if parts is None:
         pack_save(content_dir)
