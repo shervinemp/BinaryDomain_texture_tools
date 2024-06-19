@@ -131,8 +131,8 @@ def update_par(
 
     temp_par = os.path.join(TEMP_DIR, os.path.relpath(target_par, os.getcwd()))
 
-    def pack_(content_dir: str):
-        pack_add(source_par, temp_par, content_dir)
+    def pack_save(content_dir: str):
+        par_add(source_par, temp_par, content_dir)
         if os.path.exists(target_par):
             os.remove(target_par)
         link_compat(temp_par, target_par)
@@ -141,13 +141,13 @@ def update_par(
 
     prev_snapshot = ledger[target_par][1]
     if parts is None:
-        pack_(content_dir)
+        pack_save(content_dir)
     else:
         for part in os.listdir(parts_dir):
             print(f"Processing part {part}...")
             part_dir = os.path.join(parts_dir, part)
             diff = prev_snapshot.changed(part_dir)
-            pack_(part_dir)
+            pack_save(part_dir)
             source_par = target_par
 
 
@@ -174,7 +174,7 @@ def partition(content_dir, max_size=2**31):  # 2GB
     return parts_dir, parts
 
 
-def pack_add(source_par: str, dest_par: str, content_dir: str) -> None:
+def par_add(source_par: str, dest_par: str, content_dir: str) -> None:
     command_string = (
         f'{PAR_TOOL} {PAR_TOOL_ARGS} "{source_par}" "{content_dir}" "{dest_par}"'
     )
