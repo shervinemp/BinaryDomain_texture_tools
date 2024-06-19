@@ -193,6 +193,7 @@ def main():
                 fresh=args.fresh,
                 skip=args.skip,
             )
+            print("")
 
     finally:
         shutil.rmtree(TEMP_DIR)
