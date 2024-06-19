@@ -29,7 +29,12 @@ parser = argparse.ArgumentParser(description="Update game files with ParTool.")
 parser.add_argument(
     "--fresh",
     action="store_true",
-    help="Update assuming backup files as the source. Removes previous staged changes applied to the game.",
+    help="Update assuming backup files as the source.",
+)
+parser.add_argument(
+    "--skip",
+    action="store_true",
+    help="Skip updating unchanged files. (according to the ledger)",
 )
 
 
@@ -80,34 +85,36 @@ def update_par(
     content_dir: str,
     ledger: Ledger,
     fresh: bool = False,
+    skip: bool = True,
 ) -> Ledger.HashSnapshot:
     assert is_descendant_of(target_par, os.getcwd())
 
     backup_par = os.path.join(BACKUP_DIR, target_par)
-    target_par = os.path.relpath(target_par, os.getcwd())
-
     if not os.path.isfile(backup_par):  # Create backup if missing.
         os.makedirs(os.path.dirname(backup_par), exist_ok=True)
         shutil.copy2(target_par, backup_par)
 
-    if fresh:
-        source_par = backup_par
+    target_par = os.path.relpath(target_par, os.getcwd())
+    source_par = backup_par if fresh else target_par
+    par_dirty = md5(target_par) != ledger[target_par][0]
+
+    diff = ledger[target_par][1].changed(content_dir)
+    if not par_dirty:
+        no_change = len(diff) == 0
+        if skip and no_change:
+            print("No changes detected. Skipping update...")
+            temp_par = os.path.join(TEMP_DIR, os.path.relpath(target_par, os.getcwd()))
+            link_compat(source_par, temp_par)
+            shutil.rmtree(content_dir)
+            return
+
+    if fresh or par_dirty:
+        del ledger[target_par]
+        diff = ledger[target_par][1].changed(content_dir)
     else:
         if not os.path.exists(target_par):  # Fallback to backup if source is missing.
             print(f'File "{target_par}" could not be found. Using backup as source.')
-            del ledger[target_par]
             link_compat(backup_par, target_par)
-        elif md5(target_par) != ledger[target_par][0]:
-            del ledger[target_par]
-        source_par = target_par
-
-    diff = ledger[target_par][1].changed(content_dir)
-    if len(diff) == 0:
-        print("No changes detected. Skipping update...")
-        temp_par = os.path.join(TEMP_DIR, os.path.relpath(target_par, os.getcwd()))
-        link_compat(source_par, temp_par)
-        shutil.rmtree(content_dir)
-        return
 
     # remove unchanged files from the content directory
     for file in scan_dir(content_dir, recurse=True):
@@ -124,24 +131,23 @@ def update_par(
 
     temp_par = os.path.join(TEMP_DIR, os.path.relpath(target_par, os.getcwd()))
 
-    def _op(content_dir: str):
+    def pack_(content_dir: str):
         pack_add(source_par, temp_par, content_dir)
         if os.path.exists(target_par):
             os.remove(target_par)
         link_compat(temp_par, target_par)
-
-    if parts is None:
-        _op(content_dir)
-        ledger[target_par][1].update(diff)
+        ledger[target_par] = (md5(target_par), {**prev_snapshot, **diff})
         ledger.save()
+
+    prev_snapshot = ledger[target_par][1]
+    if parts is None:
+        pack_(content_dir)
     else:
         for part in os.listdir(parts_dir):
             print(f"Processing part {part}...")
             part_dir = os.path.join(parts_dir, part)
-            diff = ledger[target_par][1].changed(part_dir)
-            _op(part_dir)
-            ledger[target_par][1].update(diff)
-            ledger.save()
+            diff = prev_snapshot.changed(part_dir)
+            pack_(part_dir)
             source_par = target_par
 
 
@@ -190,8 +196,6 @@ def main():
 
     path_ = os.path.join(BACKUP_DIR, "ledger.json.gz")
     ledger = Ledger(path_)
-    if args.fresh:
-        ledger.clear()
 
     try:
         prevent_sleep()
@@ -210,6 +214,7 @@ def main():
                 content_dir=dir_path,
                 ledger=ledger,
                 fresh=args.fresh,
+                skip=args.skip,
             )
 
     finally:
