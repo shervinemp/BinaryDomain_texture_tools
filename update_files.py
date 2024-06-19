@@ -41,10 +41,10 @@ parser.add_argument(
 
 class Ledger(dict):
 
-    class HashSnapshot(dict):
+    class Snapshot(dict):
 
         def changed(self, content_dir: str) -> Self:
-            diff_entry = Ledger.HashSnapshot(
+            diff_entry = Ledger.Snapshot(
                 {
                     k: v
                     for file in scan_dir(content_dir, recurse=True)
@@ -64,16 +64,16 @@ class Ledger(dict):
         if key in self:
             super().__delitem__(key)
 
-    def __getitem__(self, key: str) -> Ledger.HashSnapshot:
+    def __getitem__(self, key: str) -> Ledger.Snapshot:
         assert is_descendant_of(key, os.getcwd())
         if key not in self:
-            self[key] = (md5_hash(key), Ledger.HashSnapshot())
+            self[key] = (md5_hash(key), Ledger.Snapshot())
         return super().__getitem__(key)
 
     def load(self) -> dict:
         with gzip.open(self._path, "rt", encoding="utf-8") as f:
             self.update(
-                {k: (v[0], Ledger.HashSnapshot(v[1])) for k, v in json.load(f).items()}
+                {k: (v[0], Ledger.Snapshot(v[1])) for k, v in json.load(f).items()}
             )
 
     def save(self) -> None:
@@ -87,7 +87,7 @@ def update_par(
     ledger: Ledger,
     fresh: bool = False,
     skip: bool = True,
-) -> Ledger.HashSnapshot:
+) -> Ledger.Snapshot:
     assert is_descendant_of(target_par, os.getcwd())
 
     backup_par = os.path.join(BACKUP_DIR, target_par)
