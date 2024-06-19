@@ -133,6 +133,7 @@ def update_par(
 
     def pack_save(content_dir: str):
         par_add(source_par, temp_par, content_dir)
+        shutil.rmtree(content_dir)
         if os.path.exists(target_par):
             os.remove(target_par)
         link_compat(temp_par, target_par)
@@ -179,7 +180,6 @@ def par_add(source_par: str, dest_par: str, content_dir: str) -> None:
         f'{PAR_TOOL} {PAR_TOOL_ARGS} "{source_par}" "{content_dir}" "{dest_par}"'
     )
     run_proc(command_string)
-    shutil.rmtree(content_dir)
 
 
 def main():
