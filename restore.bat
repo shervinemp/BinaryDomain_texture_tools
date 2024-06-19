@@ -19,7 +19,10 @@ if /i "%confirm%"=="y" (
 
         echo "Backup files restored to current directory."
     )
-)
+    set "ledger_path=%backup_dir%\ledger.json.gz"
+    if exist "%ledger_path%" (
+        del /q ledger.json.gz
+    )
 goto :eof
 
 :full_path <resultVar> <pathVar> (
