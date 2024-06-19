@@ -4,19 +4,9 @@ from functools import partial
 from itertools import product
 import shutil
 
-from utils import (
-    flatten_dir,
-    get_ddsinfo,
-    get_format_tag,
-    hardlink_files,
-    is_path_var,
-    multiproc,
-    prevent_sleep,
-    run_proc,
-    scan_dir,
-    transform_op,
-    unravel_dir,
-)
+from utils.file_utils import flatten_dir, hardlink_files, is_path_var, scan_dir, unravel_dir
+from utils.image_utils import get_ddsinfo, get_format_tag
+from utils.proc_utils import multiproc, prevent_sleep, run_proc, transform_op
 
 TEMP_DIR = os.path.abspath(".tmp")
 

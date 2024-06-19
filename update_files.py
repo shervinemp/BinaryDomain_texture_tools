@@ -1,14 +1,13 @@
 from __future__ import annotations
 from typing import Self
-from utils import (
+from utils.file_utils import (
     get_dir_size,
     get_par_dirs,
     hardlink_files,
     is_descendant_of,
     link_compat,
-    md5,
-    prevent_sleep,
-    run_proc,
+    md5_hash,
+    partition,
     scan_dir,
 )
 
@@ -17,6 +16,8 @@ import os
 import shutil
 import json
 import gzip
+
+from utils.proc_utils import prevent_sleep, run_proc
 
 
 PAR_TOOL = "ParTool.exe"
@@ -48,7 +49,7 @@ class Ledger(dict):
                     k: v
                     for file in scan_dir(content_dir, recurse=True)
                     if self.get(k := os.path.relpath(file, content_dir), None)
-                    != (v := md5(file))
+                    != (v := md5_hash(file))
                 }
             )
             return diff_entry
@@ -66,7 +67,7 @@ class Ledger(dict):
     def __getitem__(self, key: str) -> Ledger.HashSnapshot:
         assert is_descendant_of(key, os.getcwd())
         if key not in self:
-            self[key] = (md5(key), Ledger.HashSnapshot())
+            self[key] = (md5_hash(key), Ledger.HashSnapshot())
         return super().__getitem__(key)
 
     def load(self) -> dict:
@@ -96,7 +97,7 @@ def update_par(
 
     target_par = os.path.relpath(target_par, os.getcwd())
     source_par = backup_par if fresh else target_par
-    par_dirty = md5(target_par) != ledger[target_par][0]
+    par_dirty = md5_hash(target_par) != ledger[target_par][0]
 
     diff = ledger[target_par][1].changed(content_dir)
     if not par_dirty:
@@ -137,7 +138,7 @@ def update_par(
         if os.path.exists(target_par):
             os.remove(target_par)
         link_compat(temp_par, target_par)
-        ledger[target_par] = (md5(target_par), {**prev_snapshot, **diff})
+        ledger[target_par] = (md5_hash(target_par), {**prev_snapshot, **diff})
         ledger.save()
 
     prev_snapshot = ledger[target_par][1]
@@ -150,29 +151,6 @@ def update_par(
             diff = prev_snapshot.changed(part_dir)
             pack_save(part_dir)
             source_par = target_par
-
-
-def partition(content_dir, max_size=2**31):  # 2GB
-    parts = [set()]
-    last_part_size = 0
-    parts_dir = os.path.join(content_dir, ".parts")
-    for dirpath, _, filenames in os.walk(content_dir):
-        for filename in filenames:
-            file_path = os.path.join(dirpath, filename)
-            file_size = os.path.getsize(file_path)
-            if last_part_size + file_size > max_size:
-                parts.append(set())
-                last_part_size = 0
-            parts[-1].add(file_path)
-            last_part_size += file_size
-            new_path = os.path.join(
-                parts_dir,
-                f"{len(parts) - 1}",
-                os.path.relpath(file_path, content_dir),
-            )
-            os.makedirs(os.path.dirname(new_path), exist_ok=True)
-            os.rename(file_path, new_path)
-    return parts_dir, parts
 
 
 def par_add(source_par: str, dest_par: str, content_dir: str) -> None:

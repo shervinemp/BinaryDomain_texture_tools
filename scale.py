@@ -8,7 +8,8 @@ from scipy.ndimage import zoom
 from functools import reduce, wraps, partial
 from typing import Optional, Union
 
-from utils import load_image, multiproc, scan_dir
+from utils.file_utils import scan_dir
+from utils.proc_utils import load_image, multiproc
 
 # Define command-line arguments
 parser = argparse.ArgumentParser()
