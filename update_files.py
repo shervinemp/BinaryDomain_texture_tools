@@ -136,7 +136,10 @@ def update_par(
         if os.path.exists(target_par):
             os.remove(target_par)
         link_compat(temp_par, target_par)
-        ledger[target_par] = (md5_hash(target_par), {**prev_snap, **diff})
+        ledger[target_par] = (
+            md5_hash(target_par),
+            Ledger.snapshot({**prev_snap, **diff}),
+        )
         ledger.save()
 
     temp_par = os.path.join(TEMP_DIR, os.path.relpath(target_par, os.getcwd()))
