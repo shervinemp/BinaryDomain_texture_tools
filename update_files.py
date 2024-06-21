@@ -100,7 +100,10 @@ def update_par(
     par_dirty = md5_hash(target_par) != ledger[target_par][0]
 
     diff = ledger[target_par][1].changed(content_dir)
-    if not par_dirty:
+    if par_dirty:
+        if not fresh:
+            print("File has been modified since last update. Rebuilding...")
+    else:
         no_change = len(diff) == 0
         if skip and no_change:
             print("No changes detected. Skipping update...")
