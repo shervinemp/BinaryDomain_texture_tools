@@ -136,18 +136,18 @@ def update_par(
         if os.path.exists(target_par):
             os.remove(target_par)
         link_compat(temp_par, target_par)
-        ledger[target_par] = (md5_hash(target_par), {**prev_snapshot, **diff})
+        ledger[target_par] = (md5_hash(target_par), {**prev_snap, **diff})
         ledger.save()
 
     temp_par = os.path.join(TEMP_DIR, os.path.relpath(target_par, os.getcwd()))
-    prev_snapshot = ledger[target_par][1]
     if parts is None:
         pack_save(content_dir)
     else:
         for part in os.listdir(parts_dir):
             print(f"Processing part {part}...")
             part_dir = os.path.join(parts_dir, part)
-            diff = prev_snapshot.changed(part_dir)
+            prev_snap = ledger[target_par][1]
+            diff = prev_snap.changed(part_dir)
             if os.path.exists(temp_par):
                 os.remove(temp_par)
             pack_save(part_dir)
