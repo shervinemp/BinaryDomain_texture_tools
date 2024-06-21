@@ -148,7 +148,10 @@ def update_par(
             print(f"Processing part {part}...")
             part_dir = os.path.join(parts_dir, part)
             diff = prev_snapshot.changed(part_dir)
+            if os.path.exists(temp_par):
+                os.remove(temp_par)
             pack_save(part_dir)
+            os.remove(temp_par)
             source_par = target_par
 
 
