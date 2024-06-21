@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections import namedtuple
 from typing import Self
 from utils.file_utils import (
     get_dir_size,
@@ -37,12 +38,16 @@ parser.add_argument(
     action="store_true",
     help="Skip updating unchanged files. (according to the ledger)",
 )
+parser.add_argument(
+    "--ignore_mismatch",
+    action="store_true",
+    help="Avoid rebuild if the target has been modified since the last update. (according to the ledger)",
+)
 
 
 class Ledger(dict):
 
     class Snapshot(dict):
-
         def changed(self, content_dir: str) -> Self:
             diff_entry = Ledger.Snapshot(
                 {
@@ -53,6 +58,8 @@ class Ledger(dict):
                 }
             )
             return diff_entry
+
+    Entry = namedtuple("Entry", ["hash", "snapshot"])
 
     def __init__(self, file_path: str) -> None:
         super().__init__()
@@ -67,18 +74,21 @@ class Ledger(dict):
     def __getitem__(self, key: str) -> Ledger.Snapshot:
         assert is_descendant_of(key, os.getcwd())
         if key not in self:
-            self[key] = (md5_hash(key), Ledger.Snapshot())
+            self[key] = Ledger.Entry(md5_hash(key), Ledger.Snapshot())
         return super().__getitem__(key)
 
     def load(self) -> dict:
         with gzip.open(self._path, "rt", encoding="utf-8") as f:
             self.update(
-                {k: (v[0], Ledger.Snapshot(v[1])) for k, v in json.load(f).items()}
+                {
+                    k: Ledger.Entry(v[0], Ledger.Snapshot(v[1]))
+                    for k, v in json.load(f).items()
+                }
             )
 
     def save(self) -> None:
         with gzip.open(self._path, "wt", encoding="utf-8") as f:
-            json.dump({k: (v[0], dict(v[1])) for k, v in self.items()}, f)
+            json.dump(self, f)
 
 
 def update_par(
@@ -87,19 +97,18 @@ def update_par(
     ledger: Ledger,
     fresh: bool = False,
     skip: bool = True,
+    strict: bool = True,
 ) -> Ledger.Snapshot:
     assert is_descendant_of(target_par, os.getcwd())
 
     backup_par = os.path.join(BACKUP_DIR, target_par)
-    if not os.path.isfile(backup_par):  # Create backup if missing.
-        os.makedirs(os.path.dirname(backup_par), exist_ok=True)
-        shutil.copy2(target_par, backup_par)
+    create_backup_if_missing(target_par, backup_par)
 
     target_par = os.path.relpath(target_par, os.getcwd())
     source_par = backup_par if fresh else target_par
-    par_dirty = md5_hash(target_par) != ledger[target_par][0]
+    par_dirty = strict and md5_hash(target_par) != ledger[target_par].hash
 
-    diff = ledger[target_par][1].changed(content_dir)
+    diff = ledger[target_par].snapshot.changed(content_dir)
     if par_dirty:
         if not fresh:
             print("File has been modified since last update. Rebuilding...")
@@ -114,16 +123,13 @@ def update_par(
 
     if fresh or par_dirty:
         del ledger[target_par]
-        diff = ledger[target_par][1].changed(content_dir)
+        diff = ledger[target_par].snapshot.changed(content_dir)
     else:
         if not os.path.exists(target_par):  # Fallback to backup if source is missing.
             print(f'File "{target_par}" could not be found. Using backup as source.')
             link_compat(backup_par, target_par)
 
-    # remove unchanged files from the content directory
-    for file in scan_dir(content_dir, recurse=True):
-        if os.path.relpath(file, content_dir) not in diff:
-            os.remove(file)
+    remove_unchanged_files(content_dir, diff)
 
     max_size = 2**31  # 2GB
     parts = None
@@ -139,7 +145,7 @@ def update_par(
         if os.path.exists(target_par):
             os.remove(target_par)
         link_compat(temp_par, target_par)
-        ledger[target_par] = (
+        ledger[target_par] = Ledger.Entry(
             md5_hash(target_par),
             Ledger.Snapshot({**prev_snap, **diff}),
         )
@@ -147,20 +153,32 @@ def update_par(
 
     temp_par = os.path.join(TEMP_DIR, os.path.relpath(target_par, os.getcwd()))
     if parts is None:
-        prev_snap = ledger[target_par][1]
+        prev_snap = ledger[target_par].snapshot
         pack_save(content_dir)
     else:
         for part in os.listdir(parts_dir):
             print()
             print(f"Processing part {part}...")
             part_dir = os.path.join(parts_dir, part)
-            prev_snap = ledger[target_par][1]
+            prev_snap = ledger[target_par].snapshot
             diff = prev_snap.changed(part_dir)
             if os.path.exists(temp_par):
                 os.remove(temp_par)
             pack_save(part_dir)
             os.remove(temp_par)
             source_par = target_par
+
+
+def remove_unchanged_files(content_dir: str, diff: dict):
+    for file in scan_dir(content_dir, recurse=True):
+        if os.path.relpath(file, content_dir) not in diff:
+            os.remove(file)
+
+
+def create_backup_if_missing(target_par: str, backup_par: str) -> str:
+    if not os.path.isfile(backup_par):
+        os.makedirs(os.path.dirname(backup_par), exist_ok=True)
+        shutil.copy2(target_par, backup_par)
 
 
 def par_add(source_par: str, dest_par: str, content_dir: str) -> None:
@@ -203,6 +221,7 @@ def main():
                 ledger=ledger,
                 fresh=args.fresh,
                 skip=args.skip,
+                strict=not args.ignore_mismatch,
             )
             print()
 
