@@ -144,6 +144,7 @@ def update_par(
 
     temp_par = os.path.join(TEMP_DIR, os.path.relpath(target_par, os.getcwd()))
     if parts is None:
+        prev_snap = ledger[target_par][1]
         pack_save(content_dir)
     else:
         for part in os.listdir(parts_dir):
