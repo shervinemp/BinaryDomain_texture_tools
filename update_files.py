@@ -138,7 +138,7 @@ def update_par(
         link_compat(temp_par, target_par)
         ledger[target_par] = (
             md5_hash(target_par),
-            Ledger.snapshot({**prev_snap, **diff}),
+            Ledger.Snapshot({**prev_snap, **diff}),
         )
         ledger.save()
 
