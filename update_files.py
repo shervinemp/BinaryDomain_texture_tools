@@ -151,6 +151,7 @@ def update_par(
         pack_save(content_dir)
     else:
         for part in os.listdir(parts_dir):
+            print()
             print(f"Processing part {part}...")
             part_dir = os.path.join(parts_dir, part)
             prev_snap = ledger[target_par][1]
@@ -203,12 +204,12 @@ def main():
                 fresh=args.fresh,
                 skip=args.skip,
             )
-            print("")
+            print()
 
     finally:
         shutil.rmtree(TEMP_DIR)
         prevent_sleep(False)
-        print("")
+        print()
 
     print("All done!")
 
