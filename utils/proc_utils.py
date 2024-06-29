@@ -9,7 +9,7 @@ from typing import Any, Callable, Iterable, Set
 echo = partial(print, end="")
 
 
-def run_proc(command_string, silent=False):
+def run_proc(command_string, silent=False) -> None:
     with subprocess.Popen(
         command_string,
         stdout=subprocess.DEVNULL if silent else subprocess.PIPE,
@@ -53,7 +53,7 @@ def transform_op(
     target_dir: str,
     *,
     silent: bool = False,
-):
+) -> None:
     is_file = os.path.isfile(file_addr)
     rel_p_ = os.path.relpath(file_addr, source_dir)
     tp_ = os.path.join(target_dir, rel_p_)
@@ -63,7 +63,7 @@ def transform_op(
     run_proc(command_str, silent=silent)
 
 
-def prevent_sleep(reset=False):
+def prevent_sleep(reset=False) -> None:
     import ctypes
 
     # Constants for the Windows API

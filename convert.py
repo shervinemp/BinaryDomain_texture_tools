@@ -50,7 +50,7 @@ parser.add_argument(
 )
 
 
-def decompress_op(orig_path: str, target_path: str, tag: str, *, silent: bool = False):
+def decompress_op(orig_path: str, target_path: str, tag: str, *, silent: bool = False) -> None:
     decompress_args = []
     is_cubemap = tag.split("_")[-1] == "CUBEMAP"
     if is_cubemap:
@@ -68,7 +68,7 @@ def decompress_op(orig_path: str, target_path: str, tag: str, *, silent: bool = 
     )
 
 
-def decompress(path: str, args):
+def decompress(path: str, args) -> None:
     if os.path.splitext(path)[1].lower() != ".dds":
         return
 
@@ -87,10 +87,10 @@ def decompress(path: str, args):
     decompress_op(path, dest_path, tag, silent=args.silent)
 
 
-def compress_batch(tag_dir: str, args):
+def compress_batch(tag_dir: str, args) -> None:
     tag = os.path.basename(tag_dir)
     
-    def check_dds_exist(relpath):
+    def check_dds_exist(relpath) -> bool:
         dest_path = os.path.join(args.output_dir, os.path.splitext(relpath)[0] + ".dds")
         if args.skip and os.path.exists(dest_path):
             print(f'"{os.path.splitext(relpath)[0]}" already exists. Skipping...')

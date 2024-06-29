@@ -1,13 +1,16 @@
 import hashlib
 import os
 import shutil
+from typing import Generator, Optional
 
 
-def is_path_var(name):
+def is_path_var(name) -> bool:
     return shutil.which(name) is not None
 
 
-def scan_dir(path: str, recurse: bool = False, return_dirs: bool = False):
+def scan_dir(
+    path: str, recurse: bool = False, return_dirs: bool = False
+) -> Generator[str, None, None]:
     for entry in os.scandir(path):
         if entry.is_file():
             if not return_dirs:
@@ -21,7 +24,7 @@ def scan_dir(path: str, recurse: bool = False, return_dirs: bool = False):
                 )
 
 
-def get_dir_size(path: str):
+def get_dir_size(path: str) -> int:
     return sum(
         [
             os.path.getsize(os.path.join(root, file))
@@ -31,22 +34,26 @@ def get_dir_size(path: str):
     )
 
 
-def is_empty_dir(path: str):
+def is_empty_dir(path: str) -> bool:
     for _, _, files in os.walk(path):
         if files:
             return False
     return True
 
 
-def is_par_dir(path):
+def is_empty_iter(iterable) -> bool:
+    return not any(True for _ in iterable)
+
+
+def is_par_dir(path) -> bool:
     return (s_ := os.path.basename(path)).startswith("_") and s_.endswith(".par")
 
 
-def is_descendant_of(path, root):
+def is_descendant_of(path, root) -> bool:
     return not os.path.relpath(path, root).startswith("..")
 
 
-def get_par_dirs(dir_path):
+def get_par_dirs(dir_path) -> Generator[str, None, None]:
     has_files = set()
     for root, _, files in os.walk(dir_path, topdown=False):
         # check if the directory has files or if it's a subdirectory of a directory with files
@@ -58,7 +65,7 @@ def get_par_dirs(dir_path):
                 yield root
 
 
-def get_path_w_ext(base_path, extensions):
+def get_path_w_ext(base_path, extensions) -> str:
     if isinstance(extensions, str):
         extensions = (extensions,)
     for extension in extensions:
@@ -70,7 +77,7 @@ def get_path_w_ext(base_path, extensions):
     )
 
 
-def hardlink_files(src_dir, dest_dir):
+def hardlink_files(src_dir, dest_dir) -> None:
     for root, _, files in os.walk(src_dir):
         for file in files:
             src_path = os.path.join(root, file)
@@ -79,7 +86,7 @@ def hardlink_files(src_dir, dest_dir):
             link_compat(src_path, dest_path)
 
 
-def link_compat(src, dest):
+def link_compat(src, dest) -> None:
     try:
         # try hardlinking first
         os.link(src, dest)
@@ -88,7 +95,7 @@ def link_compat(src, dest):
         shutil.copy2(src, dest)
 
 
-def flatten_dir(directory):
+def flatten_dir(directory) -> dict[str, str]:
     # move all files in subdirectories to the root directory
     index = 0
     file_paths = {}
@@ -110,7 +117,7 @@ def flatten_dir(directory):
     return file_paths
 
 
-def unravel_dir(directory, file_paths):
+def unravel_dir(directory, file_paths) -> None:
     # move files back to their original subdirectories
     for filename, orig_dir in file_paths.items():
         orig_filename = filename.split("_", 1)[1]
@@ -120,7 +127,7 @@ def unravel_dir(directory, file_paths):
         os.rename(os.path.join(directory, filename), dest_path)
 
 
-def partition(dir_path, max_size=2**31):  # 2GB
+def partition(dir_path, max_size) -> tuple[str, list[set[str]]]:
     parts = [set()]
     last_part_size = 0
     parts_dir = os.path.join(dir_path, ".parts")
@@ -143,7 +150,10 @@ def partition(dir_path, max_size=2**31):  # 2GB
     return parts_dir, parts
 
 
-def md5_hash(path: str):
+def md5_hash(path: str) -> Optional[str]:
+    if not os.path.exists(path):
+        return None
+
     hash_func = hashlib.md5()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):

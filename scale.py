@@ -103,7 +103,7 @@ class SharpenSettings:
     CAS = 1
 
 
-def pil_to_numpy(func):
+def pil_to_numpy(func) -> callable:
     @wraps(func)
     def wrapper(*args, **kwargs):
         # Convert PIL image to numpy array
@@ -120,7 +120,9 @@ def pil_to_numpy(func):
     return wrapper
 
 
-def scaler(prescale=False, resample=Image.NEAREST, *resize_args, **resize_kwargs):
+def scaler(
+    prescale=False, resample=Image.NEAREST, *resize_args, **resize_kwargs
+) -> callable:
     def decorator(func):
         @wraps(func)
         def wrapper(image, scale_factor, *args, **kwargs):
@@ -146,7 +148,7 @@ def scaler(prescale=False, resample=Image.NEAREST, *resize_args, **resize_kwargs
     return decorator
 
 
-def srgb_conversion(func):
+def srgb_conversion(func) -> callable:
     @wraps(func)
     def wrapper(image, *args, srgb=False, **kwargs):
 
@@ -176,7 +178,7 @@ def srgb_conversion(func):
     return wrapper
 
 
-def convolve_separable(image, kernel_1d, mode="same"):
+def convolve_separable(image, kernel_1d, mode="same") -> np.ndarray:
     filtered = image.copy()
     if image.ndim > 2:
         for i in range(image.shape[0]):
@@ -195,7 +197,7 @@ def convolve_separable(image, kernel_1d, mode="same"):
 
 
 @scaler(prescale=True)
-def quadratic(image, scale_factor, old_size, new_size):
+def quadratic(image, scale_factor, old_size, new_size) -> Image.Image:
     image = image.resize(old_size, resample=Image.BICUBIC)
     image = image.resize(new_size, resample=Image.BICUBIC)
     return image
@@ -203,7 +205,7 @@ def quadratic(image, scale_factor, old_size, new_size):
 
 @scaler()
 @pil_to_numpy
-def catmull(image, scale_factor, old_size, new_size):
+def catmull(image, scale_factor, old_size, new_size) -> np.ndarray:
     def catmullrom_filter(in_arr):
         spline = CubicSpline(np.arange(in_arr.shape[0]), in_arr)
         return spline(np.linspace(0, in_arr.shape[0] - 1, in_arr.shape[0] * 2))
@@ -215,7 +217,7 @@ def catmull(image, scale_factor, old_size, new_size):
 
 @scaler(prescale=True, resample=Image.BILINEAR)
 @pil_to_numpy
-def mitchell(image, scale_factor, old_size, new_size, B=1 / 3, C=1 / 3):
+def mitchell(image, scale_factor, old_size, new_size, B=1 / 3, C=1 / 3) -> np.ndarray:
     def mitchell_netravali(x):
         x = abs(x)
         if x > 2:
@@ -248,19 +250,19 @@ def mitchell(image, scale_factor, old_size, new_size, B=1 / 3, C=1 / 3):
 
 @scaler()
 @pil_to_numpy
-def spline36(image, scale_factor, old_size, new_size):
+def spline36(image, scale_factor, old_size, new_size) -> np.ndarray:
     image = zoom(image, (scale_factor, scale_factor, 1), order=3)
     return image
 
 
 @scaler()
 @pil_to_numpy
-def spline64(image, scale_factor, old_size, new_size):
+def spline64(image, scale_factor, old_size, new_size) -> np.ndarray:
     image = zoom(image, (scale_factor, scale_factor, 1), order=5)
     return image
 
 
-def unsharp_mask(image, radius=2, amount=1, threshold=0):
+def unsharp_mask(image, radius=2, amount=1, threshold=0) -> Image.Image:
     blurred = image.filter(ImageFilter.GaussianBlur(radius))
     mask = Image.eval(
         image,
@@ -273,7 +275,7 @@ def unsharp_mask(image, radius=2, amount=1, threshold=0):
 @srgb_conversion
 def amd_cas(
     image, sharpness=0.5, contrast=0.5, adaptive_sharpening=0.5, sharpen_alpha=True
-):
+) -> np.ndarray:
     def sharpen_mono(y):
         blur = np.zeros_like(y)
         cv2.GaussianBlur(y, (0, 0), sigmaX=1.0, sigmaY=1.0, dst=blur)
@@ -327,7 +329,7 @@ def amd_cas(
     return sharpened
 
 
-def get_default_interpolation(ratio):
+def get_default_interpolation(ratio) -> InterpolationSettings:
     if ratio == 1.0:
         return InterpolationSettings.Bilinear
     elif ratio < 0.5:
@@ -340,7 +342,7 @@ def get_default_interpolation(ratio):
         return InterpolationSettings.Spline36
 
 
-def upscale_image(image, scale_factor, interpolation=None):
+def upscale_image(image, scale_factor, interpolation=None) -> Image.Image:
     # Compute the new dimensions of the upscaled image
     width, height = image.size
     new_width, new_height = int(width * scale_factor), int(height * scale_factor)
@@ -380,7 +382,7 @@ def upscale_image(image, scale_factor, interpolation=None):
     return upscaled_image
 
 
-def sharpen_image(image, method):
+def sharpen_image(image, method) -> Image.Image:
     if method == SharpenSettings.UnsharpMask:
         sharpened_image = unsharp_mask(image)
     elif method == SharpenSettings.CAS:
@@ -391,7 +393,7 @@ def sharpen_image(image, method):
     return sharpened_image
 
 
-def normalize_channels(image, channels):
+def normalize_channels(image, channels) -> Image.Image:
     channels = set(c.lower() for c in channels)
     bands = image.split()
     band_names = tuple(b.lower() for b in image.getbands())
@@ -406,7 +408,7 @@ def normalize_channels(image, channels):
     return Image.merge(image.mode, normalized_bands)
 
 
-def get_upscale_method(interpolation_arg):
+def get_upscale_method(interpolation_arg) -> InterpolationSettings:
     if interpolation_arg == "auto":
         interpolation = None
     else:
@@ -428,7 +430,7 @@ def get_upscale_method(interpolation_arg):
     return interpolation
 
 
-def get_sharpen_method(sharpen_arg):
+def get_sharpen_method(sharpen_arg) -> SharpenSettings:
     sharpen_map = {
         "unsharp_mask": SharpenSettings.UnsharpMask,
         "cas": SharpenSettings.CAS,
@@ -442,7 +444,7 @@ def blend(
     img1: Union[Image.Image, str],
     img2: Union[Image.Image, str],
     blend_rate: float = 0.5,
-):
+) -> Image.Image:
     img1 = load_image(img1) if isinstance(img1, str) else img1
     img2 = load_image(img2) if isinstance(img2, str) else img2
 
@@ -463,7 +465,7 @@ def process_image(
     scale: float,
     interpolation: InterpolationSettings,
     sharpen: Optional[SharpenSettings] = None,
-):
+) -> Image.Image:
     image = load_image(img) if isinstance(img, str) else img
     out_image = image
     if scale != 1.0:
@@ -473,7 +475,7 @@ def process_image(
     return out_image
 
 
-def process_file(path: str, args, config: dict):
+def process_file(path: str, args, config: dict) -> None:
     relpath = os.path.relpath(path, args.source_dir[0])
     dest_path = os.path.join(args.output_dir, relpath)
     paths_ = [

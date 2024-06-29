@@ -3,7 +3,7 @@ import subprocess
 from PIL import Image
 
 
-def load_image(path: str):
+def load_image(path: str) -> Image.Image:
     im = Image.open(path)
     if os.path.exists((p := os.path.splitext(path))[0] + "_alpha." + p[1]):
         alpha = Image.open(p[0] + "_alpha." + p[1]).convert("L")
@@ -11,7 +11,7 @@ def load_image(path: str):
     return im
 
 
-def get_format_tag(info: dict):
+def get_format_tag(info: dict) -> str:
     flags = dict_get(info, "Pixel Format.Flags")[1]
     tag_list = []
     if "DDPF_FOURCC" in flags:
@@ -31,7 +31,7 @@ def get_format_tag(info: dict):
     return tag
 
 
-def get_ddsinfo(path: str):
+def get_ddsinfo(path: str) -> dict:
     proc = subprocess.Popen(
         f'nvddsinfo "{path}"', stdin=subprocess.PIPE, stdout=subprocess.PIPE
     )
@@ -39,7 +39,7 @@ def get_ddsinfo(path: str):
     return info
 
 
-def parse_ddsinfo(lines, *, return_count=False):
+def parse_ddsinfo(lines, *, return_count=False) -> dict:
     lines = list(filter(len, lines))
     info = {}
     lines_parsed = 0
@@ -81,7 +81,7 @@ def parse_ddsinfo(lines, *, return_count=False):
     return (info, lines_parsed) if return_count else info
 
 
-def dict_get(d: dict, path: str):
+def dict_get(d: dict, path: str) -> any:
     path = path.split(".")
     for i, k in enumerate(path):
         if k not in d:
