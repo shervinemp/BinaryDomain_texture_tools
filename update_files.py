@@ -173,7 +173,7 @@ class Update:
         )
 
     def _pack(self, source_par: str, curr_snapshot: Ledger.Snapshot) -> Ledger.Entry:
-        diff = curr_snapshot.changed(self.content_dir)
+        diff = curr_snapshot.diff(self.content_dir)
         remove_unchanged_files(self.content_dir, diff)
 
         par_add(source_par, self._temp_path, self.content_dir)
