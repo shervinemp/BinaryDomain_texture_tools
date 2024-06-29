@@ -121,6 +121,7 @@ class Updater:
         if self._rebuild or mismatch_:
             source_path = backup_path
             del self.ledger[tp_]
+            ledger_entry = self.ledger[tp_]
         else:
             source_path = tp_
 
