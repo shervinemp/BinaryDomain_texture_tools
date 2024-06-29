@@ -18,7 +18,8 @@ setlocal enabledelayedexpansion enableextensions
 set "staged=__staged\"
 set "unstaged=__unstaged\"
 
-for %%i in ("%*") do (
+set "files=%*"
+for %%i in (%files%) do (
     set "file=%%~fi"
     if "!file:~-1!"=="\" set "file=!file:~0,-1!"
 
