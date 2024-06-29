@@ -9,7 +9,8 @@ from functools import reduce, wraps, partial
 from typing import Optional, Union
 
 from utils.file_utils import scan_dir
-from utils.proc_utils import load_image, multiproc
+from utils.image_utils import load_image
+from utils.proc_utils import multiproc
 
 # Define command-line arguments
 parser = argparse.ArgumentParser()
