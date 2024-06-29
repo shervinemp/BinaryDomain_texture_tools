@@ -12,13 +12,13 @@
 @REM If the file/dir is not under '__staged' or '__unstaged', it will be ignored.
 @REM
 
-@echo off
+@REM @echo off
 setlocal enabledelayedexpansion enableextensions
 
 set "staged=__staged\"
 set "unstaged=__unstaged\"
 
-for %%i in (%*) do (
+for %%i in ("%*") do (
     set "file=%%~fi"
     if "!file:~-1!"=="\" set "file=!file:~0,-1!"
 
@@ -39,12 +39,15 @@ for %%i in (%*) do (
         exit /b
     )
 
-    for %%j in ("%file_dest%") do set "dir_dest=%%~dpj"
-    if exist "%file%\" (
-        mkdir "!file_dest!" 2>nul
-        robocopy "!file!" "!file_dest!" /e /move
+    for %%j in ("!file_dest!") do set "dir_dest=%%~dpj"
+    mkdir "!dir_dest!" 2>nul
+    if exist "!file!\" (
+        robocopy "!file!" "!file_dest!" /move
     ) else (
-        mkdir "!dir_dest!" 2>nul
-        robocopy "!file!" "!file_dest!" /mov
+        for %%j in ("!file!") do (
+            set "dir_source=%%~dpj"
+            set "file=%%~nxj"
+        )
+        robocopy "!dir_source:~0,-1!" "!dir_dest:~0,-1!" "!file!" /mov
     )
 )
