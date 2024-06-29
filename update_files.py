@@ -134,11 +134,11 @@ class Updater:
             return False
 
         parts = None
-        if (dir_size := get_dir_size(self.content_dir)) > Updater.payload_max_size:
+        if (dir_size := get_dir_size(update.content_dir)) > Updater.payload_max_size:
             print(
                 f"Update ({dir_size / 2**30 : 0.2f}GB) exceeds {Updater.payload_max_size / 2**30 : 0.2f}GB. Splitting into parts..."
             )
-            parts_dir, parts = partition(self.content_dir, Updater.payload_max_size)
+            parts_dir, parts = partition(update.content_dir, Updater.payload_max_size)
 
         if parts is None:
             self.ledger[tp_] = update._pack(source_path, ledger_entry.snapshot)
