@@ -12,6 +12,7 @@ from utils.file_utils import (
     md5_hash,
     partition,
     scan_dir,
+    sizeof_fmt,
 )
 
 import argparse
@@ -138,8 +139,11 @@ class Updater:
         if (dir_size := get_dir_size(update.content_dir)) > Updater.payload_max_size:
             parts_dir, parts = partition(update.content_dir, Updater.payload_max_size)
             print(
-                f"Update ({dir_size / 2**30 : 0.2f}GB) exceeds {Updater.payload_max_size / 2**30 : 0.2f}GB. Splitting into {len(parts)} parts..."
+                f"Update size ({sizeof_fmt(dir_size)} exceeds {sizeof_fmt(Updater.payload_max_size)}."
             )
+            print("Splitting into {len(parts)} parts...")
+        else:
+            print(f"Update size: {sizeof_fmt(dir_size)}")
 
         if parts is None:
             self.ledger[tp_] = update._pack(source_path, ledger_entry.snapshot)

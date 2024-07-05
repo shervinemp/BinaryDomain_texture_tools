@@ -34,6 +34,14 @@ def get_dir_size(path: str) -> int:
     )
 
 
+def sizeof_fmt(num, decimal_places=2, suffix="B"):
+    for unit in ("", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"):
+        if abs(num) < 1024.0:
+            return f"{num:3.1f}{unit}{suffix}"
+        num /= 1024.0
+    return f"{num:.{decimal_places}f}Yi{suffix}"
+
+
 def is_empty_dir(path: str) -> bool:
     for _, _, files in os.walk(path):
         if files:
