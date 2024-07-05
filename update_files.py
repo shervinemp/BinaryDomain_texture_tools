@@ -133,7 +133,7 @@ class Updater:
             print("No changes detected. Skipping update...")
             link_compat(source_path, update._temp_path)
             shutil.rmtree(update.content_dir)
-            return False
+            return
 
         parts = None
         if (dir_size := get_dir_size(update.content_dir)) > Updater.payload_max_size:
