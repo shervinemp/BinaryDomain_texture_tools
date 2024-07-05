@@ -139,9 +139,9 @@ def partition(dir_path, max_size) -> tuple[str, list[set[str]]]:
     parts = [set()]
     last_part_size = 0
     parts_dir = os.path.join(dir_path, ".parts")
-    for dirpath, _, filenames in os.walk(dir_path):
-        for filename in filenames:
-            file_path = os.path.join(dirpath, filename)
+    for root, _, files in os.walk(dir_path):
+        for filename in files:
+            file_path = os.path.join(root, filename)
             file_size = os.path.getsize(file_path)
             if last_part_size + file_size > max_size:
                 parts.append(set())
