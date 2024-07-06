@@ -52,10 +52,11 @@ Use `python convert.py compress "my_png_directory"` to compress the PNG textures
 
 After editing, repack the textures into the game's PAR archives using `python update_files.py`. (use with `--fresh` to use backup files as base)
 This script pushes the staged files (under `__staged`) into the `.par` files. This operation requires the nested `.par` files created during extraction.
+To avoid re-applying identical changes (from previous updates), use the `--skip` argument.
 
 ### Stashing changes
 
-Use the `stash.bat` with the address of a file/directory under the staging directory, to move the contents into its equivalent subdirectory under `__unstaged`, and vice versa.
+Use the `stash.bat` with the address of a file/directory under the staging directories, to move the contents into its equivalent subdirectory under `__unstaged`, and vice versa.
 
 ### Restoring Backups
 
@@ -71,7 +72,7 @@ Launch the game to test your newly modded textures. Ensure everything appears as
 
 ## Note
 
-Upscaling some textures, especially those related to the main menu, may cause the game to crash. Proceed with caution when modifying these textures.
+Upscaling some textures to rather high resolutions can cause the game to get stuck on loading, possibly due to size limits or image dimensions exceeding thresholds. (further examination required)
 
 ## Future plans
 
