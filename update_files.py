@@ -244,7 +244,6 @@ def main():
             print(f'Processing "{dir_relpath}"...')
             update = Update(target_path, dir_path)
             updater.apply(update)
-            print()
 
     finally:
         shutil.rmtree(TEMP_DIR)
