@@ -12,7 +12,7 @@
 @REM If the file/dir is not under '__staged' or '__unstaged', it will be ignored.
 @REM
 
-@REM @echo off
+@echo off
 setlocal enabledelayedexpansion enableextensions
 
 set "staged=__staged\"
