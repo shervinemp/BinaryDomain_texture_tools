@@ -26,7 +26,9 @@ def get_format_tag(info: dict) -> str:
     if dict_get(info, "Caps.Caps 2.DDSCAPS2_CUBEMAP_ALL_FACES"):
         tag_list.append("CUBEMAP")
 
-    tag = "_".join(tag_list).replace('\x00', '').replace('\x01', '')
+    # Remove all ASCII control characters (from \x00 to \x1F)
+    tag = "_".join(tag_list)
+    tag = "".join(c for c in tag if ord(c) >= 32)
 
     return tag
 
