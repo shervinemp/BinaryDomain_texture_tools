@@ -1,6 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion enableextensions
 
+set "log_file=extraction_log.txt"
+if exist "!log_file!" del /f /q "!log_file!"
+
+set "script_dir=%cd%"
 set "par_tool=ParTool.exe"
 set "par_tool_args=extract"
 
@@ -12,8 +16,12 @@ call :process_dir "%cd%"
 goto :eof
 
 :process_dir (
-    for /r "%~1" %%F in (*.par) do (
-        call :process_file "%%F"
+    for /r "%~1" %%F in (*) do (
+        set "file_ext=%%~xF"
+        if /i "!file_ext!"==".par" (
+            echo %%F >> "!log_file!"
+            call :process_file "%%F"
+        )
     )
     exit /b
 )
@@ -49,4 +57,5 @@ goto :eof
 )
 
 :eof
+echo Extraction complete. Log saved to !log_file!
 endlocal
