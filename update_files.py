@@ -139,7 +139,7 @@ class Updater:
         if (dir_size := get_dir_size(update.content_dir)) > Updater.payload_max_size:
             parts_dir, parts = partition(update.content_dir, Updater.payload_max_size)
             print(
-                f"Update size ({sizeof_fmt(dir_size)} exceeds {sizeof_fmt(Updater.payload_max_size)}."
+                f"Update size ({sizeof_fmt(dir_size)} exceeds {sizeof_fmt(Updater.payload_max_size)})."
             )
             print(f"Splitting into {len(parts)} parts...")
         else:
