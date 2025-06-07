@@ -241,7 +241,8 @@ def main():
 parser = argparse.ArgumentParser(description="Update game files with ParTool.")
 parser.add_argument(
     "game_dir",
-    default=".",
+    nargs="?",
+    default=os.getcwd(),
     help="The game directory.",
 )
 parser.add_argument(
