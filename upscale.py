@@ -1,20 +1,14 @@
 import argparse
-import sys
 from pathlib import Path
 
 import numpy as np
 import torch
 from PIL import Image
 
-try:
-    from spandrel import ImageModelDescriptor, ModelLoader
-except ImportError as e:
-    print(f"Error importing spandrel: {e}")
-    print("Please install spandrel (pip install spandrel).")
-    sys.exit(1)
+from spandrel import ImageModelDescriptor, ModelLoader
 
 
-def collect_input_files(input_path, recursive=True):
+def collect_input_files(input_path: str, recursive: bool = True):
     """Collect all PNG files from a directory."""
 
     if not input_path.exists():
@@ -34,7 +28,7 @@ def collect_input_files(input_path, recursive=True):
     return []
 
 
-def load_image(file_path):
+def load_image(file_path: str):
     """Load an image and handle alpha channel separately if needed."""
     img = Image.open(file_path)
     img_rgba = img.convert("RGBA")
@@ -52,24 +46,7 @@ def load_image(file_path):
     return rgb, alpha
 
 
-def load_model(
-    model_path=None, device="cuda"
-):  # Added model_path parameter with default value
-    """Load the model from the specified path."""
-    if model_path is None:
-        model_path = Path(__file__).parent / "4x-PBRify_UpscalerSPANV4.pth"
-    print(f"Loading model from {model_path}...")
-    model = ModelLoader().load_from_file(model_path)
-
-    if not isinstance(model, ImageModelDescriptor):
-        raise ValueError("The loaded model is not an image-to-image model.")
-
-    # Set device and evaluate mode
-    model = model.to(device).eval()
-    return model
-
-
-def apply_max_pixels(img, max_pixels=2048):
+def apply_max_pixels(img: Image, max_pixels: int = 2048):
     """Resize image if any dimension exceeds max_pixels while preserving aspect ratio."""
     width, height = img.size
     needs_resize = width > max_pixels or height > max_pixels
@@ -88,7 +65,9 @@ def apply_max_pixels(img, max_pixels=2048):
     return img.resize((int(new_width), int(new_height)), Image.LANCZOS)
 
 
-def run_inference(input_path: Path, output_dir: Path, recursive=True, max_pixels=2048):
+def run_inference(
+    input_path: Path, output_dir: Path, recursive: bool = True, max_pixels: int = 2048
+):
     """Load a model and run inference on input tensors."""
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"Output directory set to: {output_dir}")
@@ -98,7 +77,13 @@ def run_inference(input_path: Path, output_dir: Path, recursive=True, max_pixels
     print(f"Using device: {device}")
 
     # Load model
-    model = load_model(device=device)
+    model_path = Path(__file__).parent / "4x-PBRify_UpscalerSPANV4.pth"
+    model = ModelLoader().load_from_file(model_path)
+    print(f"Loaded model from {model_path}...")
+
+    if not isinstance(model, ImageModelDescriptor):
+        raise ValueError("The loaded model is not an image-to-image model.")
+    model = model.to(device).eval()
 
     # Collect input files
     input_files = collect_input_files(input_path, recursive)
