@@ -35,16 +35,6 @@ This script processes `.par` files and extracts their contents into their respec
 
 Use `python convert.py decompress "my_dds_directory" "target_png_directory"` to decompress the DDS textures into PNG.
 
-### Editing Textures & Upscaling
-
-Edit the extracted textures using your preferred image editing software.
-
-Optionally, use the `python scale.py` script to upscale, sharpen and blend images together.
-
-### Compressing Textures
-
-Use `python convert.py compress "my_png_directory" "target_dds_directory"` to compress the PNG textures into DDS.
-
 ### Editing Textures
 
 Edit textures with the image editor of your choice.
@@ -52,6 +42,10 @@ Edit textures with the image editor of your choice.
 Alternatively, upscale using the "4X-PBRify_UpscalerSPANV4" model via `python upscale.py "my_png_directory" --output_dir "my_upscaled_directory" --max_pixels 2048`.
 
 *Note:* The max_pixels argument is set to 2048 by default since the game could crash at higher values. Use with caution.
+
+### Compressing Textures
+
+Use `python convert.py compress "my_png_directory" "target_dds_directory"` to compress the PNG textures into DDS.
 
 ### Repacking Textures
 
