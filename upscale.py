@@ -42,9 +42,9 @@ def load_image(file_path):
     alpha = img_rgba.split()[3:4]
     has_alpha = "A" in img.mode or (img.mode == "RGBA")
 
-    rgb = torch.from_numpy(np.array(rgb)).float()
+    rgb = torch.from_numpy(np.array(rgb)).float() / 255
     alpha = (
-        torch.from_numpy(np.array(alpha)).repeat((3, 1, 1)).float()
+        torch.from_numpy(np.array(alpha)).repeat((3, 1, 1)).float() / 255
         if has_alpha
         else None
     )
@@ -121,7 +121,7 @@ def run_inference(input_path: Path, output_dir: Path, recursive=True, max_pixels
                 print(f"Inference completed on batch, output shape: {output.shape}")
 
             out, *out_alpha_ = (
-                output.cpu().numpy().transpose(0, 2, 3, 1).astype("uint8")
+                output.mul(255).cpu().numpy().transpose(0, 2, 3, 1).astype("uint8")
             )
             if len(out_alpha_):
                 out_alpha = out_alpha_[0][..., :1]
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output_dir",
         type=Path,
-        default=Path("outputs/inference_results"),
+        default=Path("outputs"),
         help="Directory to save output images.",
     )
     parser.add_argument(
