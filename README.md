@@ -25,7 +25,7 @@ Make sure Python (>= 3.9) and the following tools are installed and added to you
 Use the `extract.bat` script to extract texture files from the game's PAR archives.
 
 1. **Navigate to the Game Directory**: Open a command prompt and navigate to the directory containing your game files. (as with all the other scripts)
-2. **Run the Script**: Execute `extract.bat`:
+2. **Run the Script**:
 
     ```sh
     extract.bat
