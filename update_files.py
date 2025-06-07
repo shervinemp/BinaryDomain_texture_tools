@@ -30,23 +30,6 @@ STAGED_DIR = os.path.abspath("__staged")
 TEMP_DIR = os.path.abspath(".tmp")
 BACKUP_DIR = os.path.abspath("__backup")
 
-parser = argparse.ArgumentParser(description="Update game files with ParTool.")
-parser.add_argument(
-    "--fresh",
-    action="store_true",
-    help="Update assuming backup files as the source.",
-)
-parser.add_argument(
-    "--skip",
-    action="store_true",
-    help="Skip updating unchanged files. (according to the ledger)",
-)
-parser.add_argument(
-    "--ignore_mismatch",
-    action="store_true",
-    help="Don't force a rebuild for targets modified since the last update. (according to the ledger)",
-)
-
 
 class Ledger(dict):
     Entry = namedtuple("Entry", ["hash", "snapshot"])
@@ -251,6 +234,29 @@ def main():
         print()
 
     print("All done!")
+
+
+parser = argparse.ArgumentParser(description="Update game files with ParTool.")
+parser.add_argument(
+    "game_dir",
+    default=".",
+    help="The game directory.",
+)
+parser.add_argument(
+    "--fresh",
+    action="store_true",
+    help="Update assuming backup files as the source.",
+)
+parser.add_argument(
+    "--skip",
+    action="store_true",
+    help="Skip updating unchanged files. (according to the ledger)",
+)
+parser.add_argument(
+    "--ignore_mismatch",
+    action="store_true",
+    help="Don't force a rebuild for targets modified since the last update. (according to the ledger)",
+)
 
 
 if __name__ == "__main__":
