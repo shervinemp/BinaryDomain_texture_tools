@@ -37,7 +37,7 @@ This script processes `.par` files and extracts their contents into their respec
 
 ### Converting Textures
 
-Use `python convert.py decompress "my_dds_directory"` to decompress the DDS textures into PNG.
+Use `python convert.py decompress "my_dds_directory" "target_png_directory"` to decompress the DDS textures into PNG.
 
 ### Editing Textures & Upscaling
 
@@ -47,7 +47,7 @@ Optionally, use the `python scale.py` script to upscale, sharpen and blend image
 
 ### Compressing Textures
 
-Use `python convert.py compress "my_png_directory"` to compress the PNG textures into DDS.
+Use `python convert.py compress "my_png_directory" "target_dds_directory"` to compress the PNG textures into DDS.
 
 ### Editing Textures
 
