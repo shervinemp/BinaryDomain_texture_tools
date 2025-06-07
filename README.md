@@ -51,7 +51,7 @@ Use `python convert.py compress "my_png_directory" "target_dds_directory"` to co
 
 Repack the textures into the game's PAR archives using `python update_files.py`. (use with `--fresh` to use backup files as base)
 
-This script pushes the staged files (under `__staged`) into the `.par` files. This operation requires the nested `.par` files created during extraction.
+This script pushes the staged files (under `__staged`) into the `.par` files. This operation requires the nested `.par` files created during the extraction phase.
 
 To avoid re-applying identical changes (from previous updates), use the `--skip` argument.
 
