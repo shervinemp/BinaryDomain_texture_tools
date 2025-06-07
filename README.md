@@ -51,12 +51,14 @@ Use `python convert.py compress "my_png_directory"` to compress the PNG textures
 ### Editing Textures
 
 Edit textures with the image editor of your choice.
+
 Alternatively, upscale using the "4X-PBRify_UpscalerSPANV4" model via `python upscale.py "my_png_directory" --output_dir "my_upscaled_directory" --max_pixels 2048`.
+
 *Note:* The max_pixels argument is set to 2048 by default since the game could crash at higher values. Use with caution.
 
 ### Repacking Textures
 
-After editing, repack the textures into the game's PAR archives using `python update_files.py`. (use with `--fresh` to use backup files as base)
+Repack the textures into the game's PAR archives using `python update_files.py`. (use with `--fresh` to use backup files as base)
 This script pushes the staged files (under `__staged`) into the `.par` files. This operation requires the nested `.par` files created during extraction.
 To avoid re-applying identical changes (from previous updates), use the `--skip` argument.
 
