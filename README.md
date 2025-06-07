@@ -16,7 +16,7 @@ Make sure Python (>= 3.9) and the following tools are installed and added to you
    CubeMapGen is a tool for generating and filtering cubemaps. Install and ensure the directory containing `cubemapgen_v1.1.exe` is added to your `PATH`.
 
 4. [**ParManager**](https://github.com/Kaplas80/ParManager/releases)  
-   ParManager is a utility for managing PAR archives used in SEGA-developed games like the Yakuza series and Binary Domain. It supports listing, extracting, creating, deleting, and adding files to these archives. Add the directory of the main executable to your `PATH`.
+   ParManager is a utility for managing PAR archives used in several games by Ryu Ga Gotoku Studio, including the Yakuza series and Binary Domain. It supports listing, extracting, creating, deleting, and adding files to these archives. Add the directory of the main executable to your `PATH`.
 
 ## Scripts
 
