@@ -141,7 +141,7 @@ class Updater:
             print(
                 f"Update size ({sizeof_fmt(dir_size)} exceeds {sizeof_fmt(Updater.payload_max_size)}."
             )
-            print("Splitting into {len(parts)} parts...")
+            print(f"Splitting into {len(parts)} parts...")
         else:
             print(f"Update size: {sizeof_fmt(dir_size)}")
 
