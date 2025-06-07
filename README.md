@@ -42,6 +42,7 @@ Use `python convert.py decompress "my_dds_directory"` to decompress the DDS text
 ### Editing Textures & Upscaling
 
 Edit the extracted textures using your preferred image editing software.
+
 Optionally, use the `python scale.py` script to upscale, sharpen and blend images together.
 
 ### Compressing Textures
@@ -59,7 +60,9 @@ Alternatively, upscale using the "4X-PBRify_UpscalerSPANV4" model via `python up
 ### Repacking Textures
 
 Repack the textures into the game's PAR archives using `python update_files.py`. (use with `--fresh` to use backup files as base)
+
 This script pushes the staged files (under `__staged`) into the `.par` files. This operation requires the nested `.par` files created during extraction.
+
 To avoid re-applying identical changes (from previous updates), use the `--skip` argument.
 
 ### Stashing changes
