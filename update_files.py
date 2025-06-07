@@ -199,6 +199,8 @@ def par_add(source_par: str, dest_par: str, content_dir: str) -> None:
 def main():
     args = parser.parse_args()
 
+    os.chdir(args.game_dir)
+
     if os.path.exists(TEMP_DIR):
         c = input(
             f"The contents of {TEMP_DIR} must be cleared to avoid conflict. Would you like to proceed? (y/n) "
