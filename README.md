@@ -73,7 +73,7 @@ Launch the game to test your newly modded textures. Ensure everything appears as
 
 ## Note
 
-Upscaling some textures to rather high resolutions can cause the game to get stuck on loading, possibly due to size limits or image dimensions exceeding thresholds. (further examination required)
+Upscaling textures to high resolutions might cause loading issues, possibly due to size or dimension limits. Other unknown factors could also be involved.
 
 ## Future plans
 
