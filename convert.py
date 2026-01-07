@@ -3,6 +3,7 @@ import argparse
 from functools import partial
 from itertools import product
 import shutil
+from PIL import Image
 
 from utils.file_utils import flatten_dir, hardlink_files, is_path_var, scan_dir, unravel_dir
 from utils.image_utils import get_ddsinfo, get_format_tag
@@ -10,8 +11,6 @@ from utils.proc_utils import multiproc, prevent_sleep, run_proc, transform_op
 
 TEMP_DIR = os.path.abspath(".tmp")
 
-
-# Define command-line arguments
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "operation",
@@ -49,7 +48,6 @@ parser.add_argument(
     help="skips overwriting files.",
 )
 
-
 def decompress_op(orig_path: str, target_path: str, tag: str, *, silent: bool = False) -> None:
     decompress_args = []
     is_cubemap = tag.split("_")[-1] == "CUBEMAP"
@@ -66,7 +64,6 @@ def decompress_op(orig_path: str, target_path: str, tag: str, *, silent: bool = 
         f'nvdecompress -format png {d_arg_str} "{abs_p(orig_path)}" "{abs_p(target_path)}"',
         silent=silent,
     )
-
 
 def decompress(path: str, args) -> None:
     if os.path.splitext(path)[1].lower() != ".dds":
@@ -86,6 +83,18 @@ def decompress(path: str, args) -> None:
 
     decompress_op(path, dest_path, tag, silent=args.silent)
 
+def check_resolution_safe(file_path: str, max_pixels: int = 2048) -> bool:
+    """Returns True if the image is safe (<= max_pixels), False otherwise."""
+    try:
+        with Image.open(file_path) as img:
+            w, h = img.size
+            if w > max_pixels or h > max_pixels:
+                print(f"SKIPPING UNSAFE IMAGE: {os.path.basename(file_path)} ({w}x{h}). Max allowed is {max_pixels}px.")
+                return False
+            return True
+    except Exception as e:
+        print(f"Warning: Could not check resolution for {file_path}: {e}")
+        return True
 
 def compress_batch(tag_dir: str, args) -> None:
     tag = os.path.basename(tag_dir)
@@ -99,7 +108,6 @@ def compress_batch(tag_dir: str, args) -> None:
 
     is_cubemap = tag.endswith("_CUBEMAP")
     if is_cubemap:
-
         if not is_path_var("CubeMapGen"):
             print("CubeMapGen not found. Make sure it's in your PATH.")
             return
@@ -125,16 +133,13 @@ def compress_batch(tag_dir: str, args) -> None:
             if os.path.splitext(p)[0].endswith("_face0")
         )
         files = filter(lambda x: not check_dds_exist(os.path.relpath(x, tag_dir)), files)
-        
         multiproc(fn_, files, args.p, chunksize=3)
 
     else:
         if tag == "DXT5_xGxR":
-
             if not is_path_var("crunch_x64"):
                 print("crunch_x64 not found. Make sure it's in your PATH.")
                 return
-
             compress_str = 'crunch_x64 -quiet -renormalize -mipMode Generate -dxtQuality uber -DXT5_xGxR -fileformat dds  -file "{in_path}" -outdir "{out_path}"'
         else:
             if tag == "DXT1":
@@ -154,8 +159,16 @@ def compress_batch(tag_dir: str, args) -> None:
                     print(f'Input texture format "{tag}" not supported yet!')
                     return
 
+            # FIX: Detect if we should use mipmaps
+            # UI, Fonts, and 2D elements should NOT have mipmaps in Yakuza engine
+            if any(x in tag_dir.lower() for x in ["2d", "ui", "font", "sy", "system"]):
+                mip_arg = "-nomips"
+                print(f"  [Info] Mipmaps disabled for {tag_dir} (UI/2D detected)")
+            else:
+                mip_arg = "-mipfilter kaiser"
+
             compress_str = (
-                f"nvcompress -silent -{format} -mipfilter kaiser -production "
+                f"nvcompress -silent -{format} {mip_arg} -production "
                 + '"{in_path}" "{out_path}"'
             )
 
@@ -163,9 +176,17 @@ def compress_batch(tag_dir: str, args) -> None:
         temp_outdir = os.path.join(TEMP_DIR, "_out")
         hardlink_files(tag_dir, temp_indir)
         
+        # FIX: Scan files for safety before processing
         for file_path in scan_dir(temp_indir, recurse=args.recurse):
-            if check_dds_exist(os.path.relpath(file_path, temp_indir)):
+            rel_path = os.path.relpath(file_path, temp_indir)
+
+            if check_dds_exist(rel_path):
                 os.remove(file_path)
+                continue
+
+            if not check_resolution_safe(file_path):
+                os.remove(file_path) # Remove unsafe file so it is not processed
+                continue
 
         fn_ = partial(
             transform_op,
@@ -196,10 +217,8 @@ def compress_batch(tag_dir: str, args) -> None:
         finally:
             shutil.rmtree(TEMP_DIR, ignore_errors=True)
 
-
 def main():
     args = parser.parse_args()
-
     shutil.rmtree(TEMP_DIR, ignore_errors=True)
     os.makedirs(args.output_dir, exist_ok=True)
     is_decompress = args.operation == "decompress"
@@ -208,24 +227,19 @@ def main():
         prevent_sleep()
         if is_decompress:
             if not (is_path_var("nvddsinfo") and is_path_var("nvdecompress")):
-                print(
-                    "Make sure you have NVIDIA Texture Tools installed and in your PATH."
-                )
+                print("Make sure you have NVIDIA Texture Tools installed and in your PATH.")
                 exit()
             fn_ = partial(decompress, args=args)
             multiproc(fn_, scan_dir(args.source_dir, recurse=args.recurse), args.p)
         else:
             if not is_path_var("nvcompress"):
-                print(
-                    "Make sure you have NVIDIA Texture Tools installed and in your PATH."
-                )
+                print("Make sure you have NVIDIA Texture Tools installed and in your PATH.")
                 exit()
             for tag_dir in scan_dir(args.source_dir, recurse=False, return_dirs=True):
                 print(f"Processing {tag_dir}...")
                 compress_batch(tag_dir, args)
     finally:
         prevent_sleep(False)
-
 
 if __name__ == "__main__":
     main()
