@@ -33,10 +33,7 @@ BACKUP_DIR = os.path.abspath("__backup")
 
 
 def pad_file_to_alignment(file_path: str, alignment: int = 2048) -> None:
-    """
-    Appends null bytes to the file until its size is a multiple of 'alignment'.
-    CRITICAL FIX: Prevents infinite loading/hanging at main menu.
-    """
+    """Appends null bytes to the file until its size is a multiple of 'alignment'."""
     try:
         size = os.path.getsize(file_path)
         remainder = size % alignment
@@ -188,10 +185,7 @@ class Update:
         diff = curr_snapshot.diff(self.content_dir)
         remove_unchanged_files(self.content_dir, diff)
 
-        # === FIX APPLIED HERE ===
-        # Pad files to 2048 bytes before packing to prevent infinite loading
         pad_directory(self.content_dir)
-        # ========================
 
         par_add(source_par, self._temp_path, self.content_dir)
 

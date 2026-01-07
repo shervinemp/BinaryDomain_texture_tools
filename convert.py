@@ -160,11 +160,8 @@ def compress_batch(tag_dir: str, args) -> None:
                     print(f'Input texture format "{tag}" not supported yet!')
                     return
 
-            # FIX: Detect if we should use mipmaps
-            # UI, Fonts, and 2D elements should NOT have mipmaps in Yakuza engine
             if any(x in tag_dir.lower() for x in ["2d", "ui", "font", "sy", "system"]):
                 mip_arg = "-nomips"
-                print(f"  [Info] Mipmaps disabled for {tag_dir} (UI/2D detected)")
             else:
                 mip_arg = "-mipfilter kaiser"
 
@@ -177,7 +174,6 @@ def compress_batch(tag_dir: str, args) -> None:
         temp_outdir = os.path.join(TEMP_DIR, "_out")
         hardlink_files(tag_dir, temp_indir)
         
-        # FIX: Scan files for safety before processing
         for file_path in scan_dir(temp_indir, recurse=args.recurse):
             rel_path = os.path.relpath(file_path, temp_indir)
 
@@ -186,7 +182,7 @@ def compress_batch(tag_dir: str, args) -> None:
                 continue
 
             if not check_resolution_safe(file_path):
-                os.remove(file_path) # Remove unsafe file so it is not processed
+                os.remove(file_path)
                 continue
 
         fn_ = partial(
