@@ -20,6 +20,7 @@ import os
 import shutil
 import json
 import gzip
+import sys
 
 from utils.proc_utils import prevent_sleep, run_proc
 
@@ -236,7 +237,7 @@ def main():
         if c.lower() == "y":
             shutil.rmtree(TEMP_DIR)
         else:
-            exit()
+            sys.exit()
 
     updater = Updater(
         force_rebuild=args.fresh,

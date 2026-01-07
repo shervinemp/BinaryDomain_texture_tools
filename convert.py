@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 from functools import partial
 from itertools import product
@@ -228,13 +229,13 @@ def main():
         if is_decompress:
             if not (is_path_var("nvddsinfo") and is_path_var("nvdecompress")):
                 print("Make sure you have NVIDIA Texture Tools installed and in your PATH.")
-                exit()
+                sys.exit(1)
             fn_ = partial(decompress, args=args)
             multiproc(fn_, scan_dir(args.source_dir, recurse=args.recurse), args.p)
         else:
             if not is_path_var("nvcompress"):
                 print("Make sure you have NVIDIA Texture Tools installed and in your PATH.")
-                exit()
+                sys.exit(1)
             for tag_dir in scan_dir(args.source_dir, recurse=False, return_dirs=True):
                 print(f"Processing {tag_dir}...")
                 compress_batch(tag_dir, args)
