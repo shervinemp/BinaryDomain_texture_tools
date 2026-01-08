@@ -20,6 +20,7 @@ import os
 import shutil
 import json
 import gzip
+import sys
 
 from utils.proc_utils import prevent_sleep, run_proc
 
@@ -29,6 +30,26 @@ PAR_TOOL_ARGS = "add -c 1"
 STAGED_DIR = os.path.abspath("__staged")
 TEMP_DIR = os.path.abspath(".tmp")
 BACKUP_DIR = os.path.abspath("__backup")
+
+
+def pad_file_to_alignment(file_path: str, alignment: int = 2048) -> None:
+    """Appends null bytes to the file until its size is a multiple of 'alignment'."""
+    try:
+        size = os.path.getsize(file_path)
+        remainder = size % alignment
+        if remainder != 0:
+            padding_needed = alignment - remainder
+            with open(file_path, 'ab') as f:
+                f.write(b'\x00' * padding_needed)
+    except Exception as e:
+        print(f"Warning: Could not pad {file_path}: {e}")
+
+def pad_directory(directory: str) -> None:
+    """Recursively pads all files in the directory."""
+    print(f"Applying 2048-byte alignment padding to {directory}...")
+    for root, _, files in os.walk(directory):
+        for file in files:
+            pad_file_to_alignment(os.path.join(root, file))
 
 
 class Ledger(dict):
@@ -164,6 +185,8 @@ class Update:
         diff = curr_snapshot.diff(self.content_dir)
         remove_unchanged_files(self.content_dir, diff)
 
+        pad_directory(self.content_dir)
+
         par_add(source_par, self._temp_path, self.content_dir)
 
         shutil.rmtree(self.content_dir)
@@ -208,7 +231,7 @@ def main():
         if c.lower() == "y":
             shutil.rmtree(TEMP_DIR)
         else:
-            exit()
+            sys.exit()
 
     updater = Updater(
         force_rebuild=args.fresh,

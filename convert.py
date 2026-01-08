@@ -3,6 +3,7 @@ import argparse
 from functools import partial
 from itertools import product
 import shutil
+from PIL import Image
 
 from utils.file_utils import flatten_dir, hardlink_files, is_path_var, scan_dir, unravel_dir
 from utils.image_utils import get_ddsinfo, get_format_tag
@@ -10,8 +11,6 @@ from utils.proc_utils import multiproc, prevent_sleep, run_proc, transform_op
 
 TEMP_DIR = os.path.abspath(".tmp")
 
-
-# Define command-line arguments
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "operation",
@@ -87,9 +86,26 @@ def decompress(path: str, args) -> None:
     decompress_op(path, dest_path, tag, silent=args.silent)
 
 
+def check_resolution_safe(file_path: str, max_pixels: int = 2048) -> bool:
+    """
+    Checks if image dimensions exceed the engine limit.
+    Returns True if safe, False if unsafe.
+    """
+    try:
+        with Image.open(file_path) as img:
+            w, h = img.size
+            if w > max_pixels or h > max_pixels:
+                print(f"[!] SKIP UNSAFE: {os.path.basename(file_path)} is {w}x{h} (Max: {max_pixels}).")
+                return False
+            return True
+    except Exception as e:
+        print(f"[?] WARNING: Could not check resolution for {file_path}: {e}")
+        return True  # Proceed with caution if unreadable
+
+
 def compress_batch(tag_dir: str, args) -> None:
     tag = os.path.basename(tag_dir)
-    
+
     def check_dds_exist(relpath) -> bool:
         dest_path = os.path.join(args.output_dir, os.path.splitext(relpath)[0] + ".dds")
         if args.skip and os.path.exists(dest_path):
@@ -99,7 +115,6 @@ def compress_batch(tag_dir: str, args) -> None:
 
     is_cubemap = tag.endswith("_CUBEMAP")
     if is_cubemap:
-
         if not is_path_var("CubeMapGen"):
             print("CubeMapGen not found. Make sure it's in your PATH.")
             return
@@ -125,16 +140,14 @@ def compress_batch(tag_dir: str, args) -> None:
             if os.path.splitext(p)[0].endswith("_face0")
         )
         files = filter(lambda x: not check_dds_exist(os.path.relpath(x, tag_dir)), files)
-        
+
         multiproc(fn_, files, args.p, chunksize=3)
 
     else:
         if tag == "DXT5_xGxR":
-
             if not is_path_var("crunch_x64"):
                 print("crunch_x64 not found. Make sure it's in your PATH.")
                 return
-
             compress_str = 'crunch_x64 -quiet -renormalize -mipMode Generate -dxtQuality uber -DXT5_xGxR -fileformat dds  -file "{in_path}" -outdir "{out_path}"'
         else:
             if tag == "DXT1":
@@ -143,29 +156,52 @@ def compress_batch(tag_dir: str, args) -> None:
                 format = "bc2"
             elif tag == "DXT5":
                 format = "bc3"
+            elif tag in ["ATI1", "BC4"]:
+                format = "bc4"
+            elif tag in ["ATI2", "BC5", "3Dc"]:
+                format = "bc5"
             elif tag == "RGB":
                 format = "rgb"
             elif tag == "RGB_ALPHAPIXELS":
                 format = "rgb -alpha"
             elif tag == "LUMINANCE":
                 format = "lumi"
+            elif tag == "LUMINANCE_ALPHAPIXELS":
+                format = "lumi -alpha"
+            elif tag == "ALPHA":
+                format = "alpha"
             else:
                 if not args.silent:
-                    print(f'Input texture format "{tag}" not supported yet!')
-                    return
+                    print(f'[!] Format "{tag}" unknown. Fallback to DXT5 (bc3).')
+                format = "bc3"
+
+            is_ui = any(x in tag_dir.lower() for x in ["2d", "ui", "font", "sy", "system"])
+            if is_ui:
+                mip_arg = "-nomips"
+                if not args.silent:
+                    print(f"    - Mipmaps disabled for UI/Font asset group: {tag}")
+            else:
+                mip_arg = "-mipfilter kaiser"
 
             compress_str = (
-                f"nvcompress -silent -{format} -mipfilter kaiser -production "
+                f"nvcompress -silent -{format} {mip_arg} -production "
                 + '"{in_path}" "{out_path}"'
             )
 
         temp_indir = os.path.join(TEMP_DIR, "_in")
         temp_outdir = os.path.join(TEMP_DIR, "_out")
         hardlink_files(tag_dir, temp_indir)
-        
+
         for file_path in scan_dir(temp_indir, recurse=args.recurse):
-            if check_dds_exist(os.path.relpath(file_path, temp_indir)):
+            rel_path = os.path.relpath(file_path, temp_indir)
+
+            if check_dds_exist(rel_path):
                 os.remove(file_path)
+                continue
+
+            if not check_resolution_safe(file_path):
+                os.remove(file_path)
+                continue
 
         fn_ = partial(
             transform_op,
@@ -177,7 +213,9 @@ def compress_batch(tag_dir: str, args) -> None:
         try:
             if args.recurse:
                 file_paths = flatten_dir(temp_indir)
+
             fn_(target_dir=temp_outdir)
+
             if args.recurse:
                 file_paths_dds = dict(
                     zip(
@@ -190,7 +228,7 @@ def compress_batch(tag_dir: str, args) -> None:
                 unravel_dir(temp_outdir, file_paths_dds)
 
             run_proc(
-                f'robocopy /s /move /njh /njs /ndl "{temp_outdir.rstrip('\\')}" "{args.output_dir.rstrip('\\')}"',
+                f'robocopy /s /move /njh /njs /ndl "{temp_outdir.rstrip(os.sep)}" "{args.output_dir.rstrip(os.sep)}"',
                 silent=args.silent,
             )
         finally:
@@ -221,7 +259,7 @@ def main():
                 )
                 exit()
             for tag_dir in scan_dir(args.source_dir, recurse=False, return_dirs=True):
-                print(f"Processing {tag_dir}...")
+                print(f"Processing Group: {os.path.basename(tag_dir)}...")
                 compress_batch(tag_dir, args)
     finally:
         prevent_sleep(False)
