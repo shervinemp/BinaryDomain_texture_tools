@@ -1,5 +1,4 @@
 import os
-import sys
 import argparse
 from functools import partial
 from itertools import product
@@ -49,6 +48,7 @@ parser.add_argument(
     help="skips overwriting files.",
 )
 
+
 def decompress_op(orig_path: str, target_path: str, tag: str, *, silent: bool = False) -> None:
     decompress_args = []
     is_cubemap = tag.split("_")[-1] == "CUBEMAP"
@@ -65,6 +65,7 @@ def decompress_op(orig_path: str, target_path: str, tag: str, *, silent: bool = 
         f'nvdecompress -format png {d_arg_str} "{abs_p(orig_path)}" "{abs_p(target_path)}"',
         silent=silent,
     )
+
 
 def decompress(path: str, args) -> None:
     if os.path.splitext(path)[1].lower() != ".dds":
@@ -84,22 +85,27 @@ def decompress(path: str, args) -> None:
 
     decompress_op(path, dest_path, tag, silent=args.silent)
 
+
 def check_resolution_safe(file_path: str, max_pixels: int = 2048) -> bool:
-    """Returns True if the image is safe (<= max_pixels), False otherwise."""
+    """
+    Checks if image dimensions exceed the engine limit.
+    Returns True if safe, False if unsafe.
+    """
     try:
         with Image.open(file_path) as img:
             w, h = img.size
             if w > max_pixels or h > max_pixels:
-                print(f"SKIPPING UNSAFE IMAGE: {os.path.basename(file_path)} ({w}x{h}). Max allowed is {max_pixels}px.")
+                print(f"[!] SKIP UNSAFE: {os.path.basename(file_path)} is {w}x{h} (Max: {max_pixels}).")
                 return False
             return True
     except Exception as e:
-        print(f"Warning: Could not check resolution for {file_path}: {e}")
-        return True
+        print(f"[?] WARNING: Could not check resolution for {file_path}: {e}")
+        return True  # Proceed with caution if unreadable
+
 
 def compress_batch(tag_dir: str, args) -> None:
     tag = os.path.basename(tag_dir)
-    
+
     def check_dds_exist(relpath) -> bool:
         dest_path = os.path.join(args.output_dir, os.path.splitext(relpath)[0] + ".dds")
         if args.skip and os.path.exists(dest_path):
@@ -134,34 +140,51 @@ def compress_batch(tag_dir: str, args) -> None:
             if os.path.splitext(p)[0].endswith("_face0")
         )
         files = filter(lambda x: not check_dds_exist(os.path.relpath(x, tag_dir)), files)
+
         multiproc(fn_, files, args.p, chunksize=3)
 
     else:
+        # === TEXTURE FORMAT MAPPING ===
         if tag == "DXT5_xGxR":
+            # Specialized Normal Map Handler
             if not is_path_var("crunch_x64"):
                 print("crunch_x64 not found. Make sure it's in your PATH.")
                 return
             compress_str = 'crunch_x64 -quiet -renormalize -mipMode Generate -dxtQuality uber -DXT5_xGxR -fileformat dds  -file "{in_path}" -outdir "{out_path}"'
         else:
+            # Map tag to nvcompress flags
             if tag == "DXT1":
                 format = "bc1"
             elif tag == "DXT3":
                 format = "bc2"
             elif tag == "DXT5":
                 format = "bc3"
+            elif tag in ["ATI1", "BC4"]:
+                format = "bc4"
+            elif tag in ["ATI2", "BC5", "3Dc"]:
+                format = "bc5"
             elif tag == "RGB":
                 format = "rgb"
             elif tag == "RGB_ALPHAPIXELS":
                 format = "rgb -alpha"
             elif tag == "LUMINANCE":
                 format = "lumi"
+            elif tag == "LUMINANCE_ALPHAPIXELS":
+                format = "lumi -alpha"
+            elif tag == "ALPHA":
+                format = "alpha"
             else:
                 if not args.silent:
-                    print(f'Input texture format "{tag}" not supported yet!')
-                    return
+                    print(f'[!] Format "{tag}" unknown. Fallback to DXT5 (bc3).')
+                format = "bc3"
 
-            if any(x in tag_dir.lower() for x in ["2d", "ui", "font", "sy", "system"]):
+            # === SMART MIPMAPS ===
+            # UI, Fonts, and 2D elements should NOT have mipmaps
+            is_ui = any(x in tag_dir.lower() for x in ["2d", "ui", "font", "sy", "system"])
+            if is_ui:
                 mip_arg = "-nomips"
+                if not args.silent:
+                    print(f"    - Mipmaps disabled for UI/Font asset group: {tag}")
             else:
                 mip_arg = "-mipfilter kaiser"
 
@@ -173,14 +196,18 @@ def compress_batch(tag_dir: str, args) -> None:
         temp_indir = os.path.join(TEMP_DIR, "_in")
         temp_outdir = os.path.join(TEMP_DIR, "_out")
         hardlink_files(tag_dir, temp_indir)
-        
+
+        # === PRE-FLIGHT CHECK ===
+        # Remove unsafe files from temp_indir before processing
         for file_path in scan_dir(temp_indir, recurse=args.recurse):
             rel_path = os.path.relpath(file_path, temp_indir)
 
+            # Check 1: Already exists?
             if check_dds_exist(rel_path):
                 os.remove(file_path)
                 continue
 
+            # Check 2: Resolution Safety (>2048px crash check)
             if not check_resolution_safe(file_path):
                 os.remove(file_path)
                 continue
@@ -195,7 +222,10 @@ def compress_batch(tag_dir: str, args) -> None:
         try:
             if args.recurse:
                 file_paths = flatten_dir(temp_indir)
+
+            # RUN COMPRESSION
             fn_(target_dir=temp_outdir)
+
             if args.recurse:
                 file_paths_dds = dict(
                     zip(
@@ -208,14 +238,16 @@ def compress_batch(tag_dir: str, args) -> None:
                 unravel_dir(temp_outdir, file_paths_dds)
 
             run_proc(
-                f'robocopy /s /move /njh /njs /ndl "{temp_outdir.rstrip('\\')}" "{args.output_dir.rstrip('\\')}"',
+                f'robocopy /s /move /njh /njs /ndl "{temp_outdir.rstrip(os.sep)}" "{args.output_dir.rstrip(os.sep)}"',
                 silent=args.silent,
             )
         finally:
             shutil.rmtree(TEMP_DIR, ignore_errors=True)
 
+
 def main():
     args = parser.parse_args()
+
     shutil.rmtree(TEMP_DIR, ignore_errors=True)
     os.makedirs(args.output_dir, exist_ok=True)
     is_decompress = args.operation == "decompress"
@@ -224,19 +256,24 @@ def main():
         prevent_sleep()
         if is_decompress:
             if not (is_path_var("nvddsinfo") and is_path_var("nvdecompress")):
-                print("Make sure you have NVIDIA Texture Tools installed and in your PATH.")
-                sys.exit(1)
+                print(
+                    "Make sure you have NVIDIA Texture Tools installed and in your PATH."
+                )
+                exit()
             fn_ = partial(decompress, args=args)
             multiproc(fn_, scan_dir(args.source_dir, recurse=args.recurse), args.p)
         else:
             if not is_path_var("nvcompress"):
-                print("Make sure you have NVIDIA Texture Tools installed and in your PATH.")
-                sys.exit(1)
+                print(
+                    "Make sure you have NVIDIA Texture Tools installed and in your PATH."
+                )
+                exit()
             for tag_dir in scan_dir(args.source_dir, recurse=False, return_dirs=True):
-                print(f"Processing {tag_dir}...")
+                print(f"Processing Group: {os.path.basename(tag_dir)}...")
                 compress_batch(tag_dir, args)
     finally:
         prevent_sleep(False)
+
 
 if __name__ == "__main__":
     main()
